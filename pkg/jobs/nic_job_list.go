@@ -95,6 +95,66 @@ func NICJobList() []Job {
 			},
 		},
 		{
+			Name:    "exec-agent-conf",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				command := []string{"cat", "/etc/nginx-agent/nginx-agent.conf"}
+				for _, namespace := range dc.Namespaces {
+					pods, err := dc.K8sCoreClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve pod list for namespace %s: %v\n", namespace, err)
+					} else {
+						for _, pod := range pods.Items {
+							if strings.Contains(pod.Name, "ingress") {
+								for _, container := range pod.Spec.Containers {
+									res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
+									if err != nil {
+										jobResult.Error = err
+										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
+									} else {
+										fileName := fmt.Sprintf("%s__%s__nginx-agent.conf", pod.Name, container.Name)
+										jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+									}
+								}
+							}
+						}
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "exec-agent-version",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				command := []string{"/usr/bin/nginx-agent", "--version"}
+				for _, namespace := range dc.Namespaces {
+					pods, err := dc.K8sCoreClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve pod list for namespace %s: %v\n", namespace, err)
+					} else {
+						for _, pod := range pods.Items {
+							if strings.Contains(pod.Name, "ingress") {
+								for _, container := range pod.Spec.Containers {
+									res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
+									if err != nil {
+										jobResult.Error = err
+										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
+									} else {
+										fileName := fmt.Sprintf("%s__%s__nginx-agent-version.txt", pod.Name, container.Name)
+										jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+									}
+								}
+							}
+						}
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
 			Name:    "crd-objects",
 			Timeout: time.Second * 10,
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
