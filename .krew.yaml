@@ -42,7 +42,7 @@ spec:
     {{addURIAndSha "https://github.com/nginx/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_windows_arm64.tar.gz" .TagName }}
     bin: kubectl-nginx_supportpkg
   shortDescription: Collect support packages for NGINX products that run on k8s
-  homepage: https://github.com/nginxinc/nginx-supportpkg-for-k8s
+  homepage: https://github.com/nginx/nginx-supportpkg-for-k8s
   description: |
     Provides a single command to collect troubleshooting information
     for all NGINX products that run on k8s.
