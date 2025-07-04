@@ -186,38 +186,59 @@ func NIMJobList() []Job {
 			},
 		},
 		{
-			Name:    "exec-dqlite-dump-core",
+			Name:    "exec-dqlite-dump",
 			Timeout: time.Second * 30,
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
-				containerName := "core"
-				dbName := "core"
-				outputFile := "/tmp/core.sql"
-				dbAddr := "0.0.0.0:7891"
+
+				dbConfigs := []struct {
+					dbName        string
+					containerName string
+					outputFile    string
+					dbAddr        string
+				}{
+					{"core", "core", "/tmp/core.sql", "0.0.0.0:7891"},
+					{"dpm", "dpm", "/tmp/dpm.sql", "0.0.0.0:7890"},
+					{"integrations", "integrations", "/tmp/integrations.sql", "0.0.0.0:7892"},
+					{"license", "integrations", "/tmp/license.sql", "0.0.0.0:7893"},
+					// Add more containers as needed
+				}
 
 				// /etc/nms/scripts/dqlite-backup -n core -c /etc/nms/nms.conf -a 0.0.0.0:7891 -o /tmp/core.sql -k
-				command := []string{dqliteBackupPath, "-n", dbName, "-c", nmsConfigPath, "-a", dbAddr, "-o", outputFile, "-k"}
+
 				for _, namespace := range dc.Namespaces {
 					pods, err := dc.K8sCoreClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 					if err != nil {
 						dc.Logger.Printf("\tCould not retrieve pod list for namespace %s: %v\n", namespace, err)
 					} else {
-						for _, pod := range pods.Items {
-							if strings.Contains(pod.Name, containerName) {
-								res, err := dc.PodExecutor(namespace, pod.Name, containerName, command, ctx)
-								if err != nil {
-									jobResult.Error = err
-									dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
-								} else {
-									jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__dqlite-dump-"+containerName+".txt")] = res
-
-									// Move the dumped file to the base directory
-									destPathFilename := filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__dqlite-dump-"+filepath.Base(outputFile))
-									if err := dc.CopyFileFromPod(namespace, pod.Name, containerName, outputFile, destPathFilename, ctx); err != nil {
+						for _, config := range dbConfigs {
+							command := []string{dqliteBackupPath, "-n", config.dbName, "-c", nmsConfigPath, "-a", config.dbAddr, "-o", config.outputFile, "-k"}
+							for _, pod := range pods.Items {
+								if strings.Contains(pod.Name, config.containerName) {
+									res, err := dc.PodExecutor(namespace, pod.Name, config.containerName, command, ctx)
+									if err != nil {
 										jobResult.Error = err
-										dc.Logger.Printf("\tFailed to copy dumped file for pod %s in namespace %s: %v\n", pod.Name, namespace, err)
+										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
 									} else {
-										dc.Logger.Printf("\tSuccessfully copied dumped file for pod %s in namespace %s\n", pod.Name, namespace)
+										jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__dqlite-dump-"+config.dbName+".txt")] = res
+
+										// Copy the dumped file from the pod to the host
+										destPathFilename := filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__dqlite-dump-"+filepath.Base(config.outputFile))
+										if err := dc.CopyFileFromPod(namespace, pod.Name, config.containerName, config.outputFile, destPathFilename, ctx); err != nil {
+											jobResult.Error = err
+											dc.Logger.Printf("\tFailed to copy dumped file %s from pod %s in namespace %s to %s: %v\n", config.outputFile, pod.Name, namespace, destPathFilename, err)
+										} else {
+											dc.Logger.Printf("\tSuccessfully copied dumped file %s from pod %s in namespace %s to %s\n", config.outputFile, pod.Name, namespace, destPathFilename)
+										}
+
+										// Remove/delete the dumped file from the pod
+										_, err := dc.PodExecutor(namespace, pod.Name, config.containerName, []string{"rm", "-f", config.outputFile}, ctx)
+										if err != nil {
+											jobResult.Error = err
+											dc.Logger.Printf("\tFailed to remove dumped file %s from pod %s in namespace %s: %v\n", config.outputFile, pod.Name, namespace, err)
+										} else {
+											dc.Logger.Printf("\tSuccessfully removed dumped file %s from pod %s in namespace %s\n", config.outputFile, pod.Name, namespace)
+										}
 									}
 								}
 							}
