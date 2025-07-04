@@ -24,9 +24,15 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
 	helmClient "github.com/mittwald/go-helm-client"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
-	"io"
 	corev1 "k8s.io/api/core/v1"
 	crdClient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,11 +44,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/homedir"
 	metricsClient "k8s.io/metrics/pkg/client/clientset/versioned"
-	"log"
-	"os"
-	"path/filepath"
-	"strconv"
-	"time"
 )
 
 type DataCollector struct {
@@ -265,4 +266,156 @@ func (c *DataCollector) AllNamespacesExist() bool {
 	}
 
 	return allExist
+}
+
+// // CopyFileFromPod copies a file from a pod's container to the local filesystem.
+// func (c *DataCollector) CopyFileFromPod(namespace, pod, container, srcPath, destPath string, ctx context.Context) error {
+// 	cmd := []string{"tar", "cf", "-", "-C", filepath.Dir(srcPath), filepath.Base(srcPath)}
+// 	req := c.K8sCoreClientSet.CoreV1().RESTClient().Post().
+// 		Namespace(namespace).
+// 		Resource("pods").
+// 		Name(pod).
+// 		SubResource("exec").
+// 		VersionedParams(&corev1.PodExecOptions{
+// 			Container: container,
+// 			Command:   cmd,
+// 			Stdin:     false,
+// 			Stdout:    true,
+// 			Stderr:    true,
+// 			TTY:       false,
+// 		}, scheme.ParameterCodec)
+
+// 	exec, err := remotecommand.NewSPDYExecutor(c.K8sRestConfig, "POST", req.URL())
+// 	if err != nil {
+// 		return err
+// 	}
+// 	fmt.Printf("Started remote command\n")
+// 	reader, writer := io.Pipe()
+// 	// var wg sync.WaitGroup
+// 	var streamErr error
+// 	// wg.Add(1)
+// 	go func() {
+// 		defer writer.Close()
+// 		// 	defer wg.Done()
+// 		streamErr = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+// 			Stdout: writer,
+// 			Stderr: os.Stderr,
+// 		})
+// 	}()
+
+// 	tr := tar.NewReader(reader)
+// 	fmt.Printf("New Reader started\n")
+// 	var copyErr error
+// 	for {
+// 		header, err := tr.Next()
+// 		if err == io.EOF {
+// 			fmt.Printf("Reached end of tar stream\n")
+// 			break
+// 		}
+// 		if err != nil {
+// 			copyErr = err
+// 			break
+// 		}
+// 		if header.Typeflag == tar.TypeReg {
+// 			fmt.Printf("Copying file %s to destPath %s\n", header.Name, destPath)
+// 			outFile, err := os.Create(destPath)
+// 			if err != nil {
+// 				copyErr = err
+// 				break
+// 			}
+// 			fmt.Printf("Copying file %s to outFile %s\n", header.Name, outFile.Name())
+// 			defer outFile.Close()
+// 			_, err = io.Copy(outFile, tr)
+
+// 			if err != nil {
+// 				copyErr = err
+// 				break
+// 			}
+// 		}
+// 	}
+// 	// Wait for the goroutine to finish
+// 	fmt.Printf("Waiting for stream to finish\n")
+// 	// wg.Wait()
+// 	fmt.Printf("Stream finished\n")
+// 	if copyErr != nil {
+// 		fmt.Printf("Error copying file: %v\n", copyErr)
+// 		return copyErr
+// 	}
+// 	if streamErr != nil {
+// 		fmt.Printf("Error executing command in pod: %v\n", streamErr)
+// 		return streamErr
+// 	}
+// 	return nil
+// }
+
+// CopyFileFromPod copies a file from a pod's container to the local filesystem.
+func (c *DataCollector) CopyFileFromPod(namespace, pod, container, srcPath, destPath string, ctx context.Context) error {
+	cmd := []string{"tar", "cf", "-", "-C", filepath.Dir(srcPath), filepath.Base(srcPath)}
+	req := c.K8sCoreClientSet.CoreV1().RESTClient().Post().
+		Namespace(namespace).
+		Resource("pods").
+		Name(pod).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: container,
+			Command:   cmd,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(c.K8sRestConfig, "POST", req.URL())
+	if err != nil {
+		return err
+	}
+
+	// Stream the data from the Pod
+	var stdout, stderr bytes.Buffer
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	if err != nil {
+		// return fmt.Errorf("error in streaming: %w. Stderr: %s", err, stderr.String())
+		return err
+	}
+
+	// Create a local file to save the output
+	localFile, err := os.Create(destPath)
+	if err != nil {
+		// return fmt.Errorf("failed to create local file: %w", err)
+		return err
+	}
+	defer localFile.Close()
+
+	// Untar the stream and write the content to the local file
+	tarReader := tar.NewReader(&stdout)
+	for {
+		// fmt.Printf("Reading tar stream\n")
+		// fmt.Println("Tar output length:", stdout.Len())
+		header, err := tarReader.Next()
+
+		if err == io.EOF {
+			// fmt.Printf("Reached end of tar stream\n")
+			break // End of tar archive
+		}
+		if err != nil {
+			// return fmt.Errorf("error reading tar stream: %w", err)
+			return err
+		}
+
+		// Ensure the tar file matches the expected file path
+		// fmt.Printf("Header Name: %s\n", header.Name)
+		if header.Name == filepath.Base(srcPath) {
+			// fmt.Printf("Copying file %s to destPath %s\n", header.Name, destPath)
+			_, err = io.Copy(localFile, tarReader)
+			if err != nil {
+				return fmt.Errorf("failed to write to local file: %w", err)
+			}
+			break
+		}
+	}
+
+	return nil
 }

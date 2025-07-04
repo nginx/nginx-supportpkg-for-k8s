@@ -28,6 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var dqliteBackupPath = "/etc/nms/scripts/dqlite-backup"
+var nmsConfigPath = "/etc/nms/nms.conf"
+
 var clickhouseCommands = map[string]string{
 	"events.csv":                        "SELECT * FROM nms.events WHERE creation_time > subtractHours(now(),${default_hrs}) ORDER BY creation_time DESC LIMIT ${max_log_limit} FORMAT CSVWithNames",
 	"metrics.csv":                       "SELECT * FROM nms.metrics WHERE timestamp > subtractHours(now(),${default_hrs}) AND date > toDate(subtractDays(now(),${max_num_days})) ORDER BY timestamp DESC LIMIT ${max_log_limit} FORMAT CSVWithNames",
@@ -63,7 +66,7 @@ var clickhouseCommands = map[string]string{
 func NIMJobList() []Job {
 	jobList := []Job{
 		{
-			Name:    "exec-nginx-t",
+			Name:    "exec-apigw-nginx-t",
 			Timeout: time.Second * 10,
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
@@ -74,13 +77,40 @@ func NIMJobList() []Job {
 						dc.Logger.Printf("\tCould not retrieve pod list for namespace %s: %v\n", namespace, err)
 					} else {
 						for _, pod := range pods.Items {
-							if strings.Contains(pod.Name, "nginx") {
-								res, err := dc.PodExecutor(namespace, pod.Name, "nginx", command, ctx)
+							if strings.Contains(pod.Name, "apigw") {
+								res, err := dc.PodExecutor(namespace, pod.Name, "apigw", command, ctx)
 								if err != nil {
 									jobResult.Error = err
 									dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
 								} else {
 									jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__nginx-t.txt")] = res
+								}
+							}
+						}
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "exec-apigw-nginx-version",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				command := []string{"/usr/sbin/nginx", "-v"}
+				for _, namespace := range dc.Namespaces {
+					pods, err := dc.K8sCoreClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve pod list for namespace %s: %v\n", namespace, err)
+					} else {
+						for _, pod := range pods.Items {
+							if strings.Contains(pod.Name, "apigw") {
+								res, err := dc.PodExecutor(namespace, pod.Name, "apigw", command, ctx)
+								if err != nil {
+									jobResult.Error = err
+									dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
+								} else {
+									jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__nginx-version.txt")] = res
 								}
 							}
 						}
@@ -146,6 +176,48 @@ func NIMJobList() []Job {
 										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
 									} else {
 										jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__"+fileName)] = res
+									}
+								}
+							}
+						}
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "exec-dqlite-dump-core",
+			Timeout: time.Second * 30,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				containerName := "core"
+				dbName := "core"
+				outputFile := "/tmp/core.sql"
+				dbAddr := "0.0.0.0:7891"
+
+				// /etc/nms/scripts/dqlite-backup -n core -c /etc/nms/nms.conf -a 0.0.0.0:7891 -o /tmp/core.sql -k
+				command := []string{dqliteBackupPath, "-n", dbName, "-c", nmsConfigPath, "-a", dbAddr, "-o", outputFile, "-k"}
+				for _, namespace := range dc.Namespaces {
+					pods, err := dc.K8sCoreClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve pod list for namespace %s: %v\n", namespace, err)
+					} else {
+						for _, pod := range pods.Items {
+							if strings.Contains(pod.Name, containerName) {
+								res, err := dc.PodExecutor(namespace, pod.Name, containerName, command, ctx)
+								if err != nil {
+									jobResult.Error = err
+									dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
+								} else {
+									jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__dqlite-dump-"+containerName+".txt")] = res
+
+									// Move the dumped file to the base directory
+									destPathFilename := filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__dqlite-dump-"+filepath.Base(outputFile))
+									if err := dc.CopyFileFromPod(namespace, pod.Name, containerName, outputFile, destPathFilename, ctx); err != nil {
+										jobResult.Error = err
+										dc.Logger.Printf("\tFailed to copy dumped file for pod %s in namespace %s: %v\n", pod.Name, namespace, err)
+									} else {
+										dc.Logger.Printf("\tSuccessfully copied dumped file for pod %s in namespace %s\n", pod.Name, namespace)
 									}
 								}
 							}
