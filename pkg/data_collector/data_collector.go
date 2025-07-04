@@ -24,9 +24,15 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
 	helmClient "github.com/mittwald/go-helm-client"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
-	"io"
 	corev1 "k8s.io/api/core/v1"
 	crdClient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,11 +44,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/homedir"
 	metricsClient "k8s.io/metrics/pkg/client/clientset/versioned"
-	"log"
-	"os"
-	"path/filepath"
-	"strconv"
-	"time"
 )
 
 type DataCollector struct {
@@ -265,4 +266,69 @@ func (c *DataCollector) AllNamespacesExist() bool {
 	}
 
 	return allExist
+}
+
+// CopyFileFromPod copies a file from a pod's container to the local filesystem.
+func (c *DataCollector) CopyFileFromPod(namespace, pod, container, srcPath, destPath string, ctx context.Context) error {
+	cmd := []string{"tar", "cf", "-", "-C", filepath.Dir(srcPath), filepath.Base(srcPath)}
+	req := c.K8sCoreClientSet.CoreV1().RESTClient().Post().
+		Namespace(namespace).
+		Resource("pods").
+		Name(pod).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: container,
+			Command:   cmd,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(c.K8sRestConfig, "POST", req.URL())
+	if err != nil {
+		return err
+	}
+
+	// Stream the data from the Pod
+	var stdout, stderr bytes.Buffer
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Create a local file to save the output
+	localFile, err := os.Create(destPath)
+	if err != nil {
+		// return fmt.Errorf("failed to create local file: %w", err)
+		return err
+	}
+	defer localFile.Close()
+
+	// Untar the stream and write the content to the local file
+	tarReader := tar.NewReader(&stdout)
+	for {
+		header, err := tarReader.Next()
+
+		if err == io.EOF {
+			break // End of tar archive
+		}
+		if err != nil {
+			return err
+		}
+
+		// Ensure the tar file matches the expected file path
+		if header.Name == filepath.Base(srcPath) {
+			_, err = io.Copy(localFile, tarReader)
+			if err != nil {
+				return fmt.Errorf("failed to write to local file: %w", err)
+			}
+			break
+		}
+	}
+
+	return nil
 }

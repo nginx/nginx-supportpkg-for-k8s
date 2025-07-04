@@ -23,12 +23,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
 	"io"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
 	"time"
+
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func CommonJobList() []Job {
@@ -83,6 +84,91 @@ func CommonJobList() []Job {
 								}
 							}
 						}
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "pv-list",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				for _, namespace := range dc.Namespaces {
+					result, err := dc.K8sCoreClientSet.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve persistent volumes list %s: %v\n", namespace, err)
+					} else {
+						jsonResult, _ := json.MarshalIndent(result, "", "  ")
+						jobResult.Files[filepath.Join(dc.BaseDir, "resources", namespace, "persistentvolumes.json")] = jsonResult
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "pvc-list",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				for _, namespace := range dc.Namespaces {
+					result, err := dc.K8sCoreClientSet.CoreV1().PersistentVolumeClaims(namespace).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve persistent volume claims list %s: %v\n", namespace, err)
+					} else {
+						jsonResult, _ := json.MarshalIndent(result, "", "  ")
+						jobResult.Files[filepath.Join(dc.BaseDir, "resources", namespace, "persistentvolumeclaims.json")] = jsonResult
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "sc-list",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				for _, namespace := range dc.Namespaces {
+					result, err := dc.K8sCoreClientSet.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve storage classes list %s: %v\n", namespace, err)
+					} else {
+						jsonResult, _ := json.MarshalIndent(result, "", "  ")
+						jobResult.Files[filepath.Join(dc.BaseDir, "resources", namespace, "storageclasses.json")] = jsonResult
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "apiresources-list",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				for _, namespace := range dc.Namespaces {
+					result, err := dc.K8sCoreClientSet.DiscoveryClient.ServerPreferredResources()
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve API resources list %s: %v\n", namespace, err)
+					} else {
+						jsonResult, _ := json.MarshalIndent(result, "", "  ")
+						jobResult.Files[filepath.Join(dc.BaseDir, "resources", namespace, "apiresources.json")] = jsonResult
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "apiversions-list",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				for _, namespace := range dc.Namespaces {
+					result, err := dc.K8sCoreClientSet.DiscoveryClient.ServerGroups()
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve API versions list %s: %v\n", namespace, err)
+					} else {
+						jsonResult, _ := json.MarshalIndent(result, "", "  ")
+						jobResult.Files[filepath.Join(dc.BaseDir, "resources", namespace, "apiversions.json")] = jsonResult
 					}
 				}
 				ch <- jobResult
