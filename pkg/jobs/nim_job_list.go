@@ -148,7 +148,7 @@ func NIMJobList() []Job {
 		},
 		{
 			Name:    "exec-clickhouse-data",
-			Timeout: time.Second * 100,
+			Timeout: time.Second * 600,
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
 				// command := []string{"clickhouse-client", "--database", "nms", "-q", "SHOW CREATE TABLE nms.events"}
@@ -187,7 +187,7 @@ func NIMJobList() []Job {
 		},
 		{
 			Name:    "exec-dqlite-dump",
-			Timeout: time.Second * 30,
+			Timeout: time.Second * 600,
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
 
