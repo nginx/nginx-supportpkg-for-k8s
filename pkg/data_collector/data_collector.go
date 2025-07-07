@@ -47,15 +47,17 @@ import (
 )
 
 type DataCollector struct {
-	BaseDir             string
-	Namespaces          []string
-	Logger              *log.Logger
-	LogFile             *os.File
-	K8sRestConfig       *rest.Config
-	K8sCoreClientSet    *kubernetes.Clientset
-	K8sCrdClientSet     *crdClient.Clientset
-	K8sMetricsClientSet *metricsClient.Clientset
-	K8sHelmClientSet    map[string]helmClient.Client
+	BaseDir               string
+	Namespaces            []string
+	Logger                *log.Logger
+	LogFile               *os.File
+	K8sRestConfig         *rest.Config
+	K8sCoreClientSet      *kubernetes.Clientset
+	K8sCrdClientSet       *crdClient.Clientset
+	K8sMetricsClientSet   *metricsClient.Clientset
+	K8sHelmClientSet      map[string]helmClient.Client
+	ExcludeDBData         bool
+	ExcludeTimeSeriesData bool
 }
 
 func NewDataCollector(namespaces ...string) (*DataCollector, error) {

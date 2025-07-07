@@ -20,12 +20,12 @@ package jobs
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
 )
 
 type Job struct {
@@ -35,11 +35,12 @@ type Job struct {
 }
 
 type JobResult struct {
-	Files map[string][]byte
-	Error error
+	Files   map[string][]byte
+	Error   error
+	Skipped bool
 }
 
-func (j Job) Collect(dc *data_collector.DataCollector) error {
+func (j Job) Collect(dc *data_collector.DataCollector) (error, bool) {
 	ch := make(chan JobResult, 1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), j.Timeout)
@@ -51,28 +52,29 @@ func (j Job) Collect(dc *data_collector.DataCollector) error {
 	select {
 	case <-ctx.Done():
 		dc.Logger.Printf("\tJob %s has timed out: %s\n---\n", j.Name, ctx.Err())
-		return errors.New(fmt.Sprintf("Context cancelled: %v", ctx.Err()))
+		err := fmt.Errorf("Context cancelled: %v", ctx.Err())
+		return err, false
 
 	case jobResults := <-ch:
 		if jobResults.Error != nil {
 			dc.Logger.Printf("\tJob %s has failed: %s\n", j.Name, jobResults.Error)
-			return jobResults.Error
+			return jobResults.Error, jobResults.Skipped
 		}
 
 		for fileName, fileValue := range jobResults.Files {
 			err := os.MkdirAll(filepath.Dir(fileName), os.ModePerm)
 			if err != nil {
-				return fmt.Errorf("MkdirAll failed: %v", err)
+				return fmt.Errorf("MkdirAll failed: %v", err), jobResults.Skipped
 			}
 			file, _ := os.Create(fileName)
 			_, err = file.Write(fileValue)
 			if err != nil {
-				return fmt.Errorf("Write failed: %v", err)
+				return fmt.Errorf("Write failed: %v", err), jobResults.Skipped
 			}
 			_ = file.Close()
 			dc.Logger.Printf("\tJob %s wrote %d bytes to %s\n", j.Name, len(fileValue), fileName)
 		}
 		dc.Logger.Printf("\tJob %s completed successfully\n---\n", j.Name)
-		return nil
+		return nil, jobResults.Skipped
 	}
 }

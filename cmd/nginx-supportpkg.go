@@ -33,6 +33,8 @@ func Execute() {
 
 	var namespaces []string
 	var product string
+	var excludeDBData bool
+	var excludeTimeSeriesData bool
 	var jobList []jobs.Job
 
 	var rootCmd = &cobra.Command{
@@ -45,6 +47,13 @@ func Execute() {
 			if err != nil {
 				fmt.Println(fmt.Errorf("unable to start data collector: %s", err))
 				os.Exit(1)
+			}
+
+			if excludeDBData {
+				collector.ExcludeDBData = true
+			}
+			if excludeTimeSeriesData {
+				collector.ExcludeTimeSeriesData = true
 			}
 
 			collector.Logger.Printf("Starting kubectl-nginx-supportpkg - version: %s - build: %s", version.Version, version.Build)
@@ -68,8 +77,10 @@ func Execute() {
 				failedJobs := 0
 				for _, job := range jobList {
 					fmt.Printf("Running job %s...", job.Name)
-					err = job.Collect(collector)
-					if err != nil {
+					err, Skipped := job.Collect(collector)
+					if Skipped {
+						fmt.Print(" SKIPPED\n")
+					} else if err != nil {
 						fmt.Printf(" Error: %s\n", err)
 						failedJobs++
 					} else {
@@ -108,6 +119,9 @@ func Execute() {
 		os.Exit(1)
 	}
 
+	rootCmd.Flags().BoolVarP(&excludeDBData, "exclude-db-data", "d", false, "exclude DB data collection")
+	rootCmd.Flags().BoolVarP(&excludeTimeSeriesData, "exclude-time-series-data", "t", false, "exclude time series data collection")
+
 	versionStr := "nginx-supportpkg - version: " + version.Version + " - build: " + version.Build + "\n"
 	rootCmd.SetVersionTemplate(versionStr)
 	rootCmd.Version = versionStr
@@ -118,7 +132,8 @@ func Execute() {
 			"\n nginx-supportpkg -h|--help" +
 			"\n nginx-supportpkg -v|--version" +
 			"\n nginx-supportpkg [-n|--namespace] ns1 [-n|--namespace] ns2 [-p|--product] [nic,ngf,ngx,nim]" +
-			"\n nginx-supportpkg [-n|--namespace] ns1,ns2 [-p|--product] [nic,ngf,ngx,nim] \n")
+			"\n nginx-supportpkg [-n|--namespace] ns1,ns2 [-p|--product] [nic,ngf,ngx,nim]" +
+			"\n nginx-supportpkg [-n|--namespace] ns1 [-n|--namespace] ns2 [-p|--product] [nim] [-d|--exclude-db-data] [-t|--exclude-time-series-data] \n")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

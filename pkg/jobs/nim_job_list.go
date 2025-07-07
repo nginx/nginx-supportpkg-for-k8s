@@ -151,7 +151,14 @@ func NIMJobList() []Job {
 			Timeout: time.Second * 600,
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
-				// command := []string{"clickhouse-client", "--database", "nms", "-q", "SHOW CREATE TABLE nms.events"}
+
+				if dc.ExcludeTimeSeriesData {
+					dc.Logger.Printf("\tSkipping clickhouse data dump as ExcludeTimeSeriesData is set to true\n")
+					jobResult.Skipped = true
+					ch <- jobResult
+					return
+				}
+
 				for _, namespace := range dc.Namespaces {
 					pods, err := dc.K8sCoreClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 					if err != nil {
@@ -191,6 +198,14 @@ func NIMJobList() []Job {
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
 
+				if dc.ExcludeDBData {
+					dc.Logger.Printf("\tSkipping dqlite dump as ExcludeDBData is set to true\n")
+					jobResult.Skipped = true
+					ch <- jobResult
+					return
+				}
+				// Check if ExcludeDBData is set to true, skip dump if so
+				// (already handled above with dc.ExcludeDBData)
 				dbConfigs := []struct {
 					dbName        string
 					containerName string
