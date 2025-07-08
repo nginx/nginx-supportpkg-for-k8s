@@ -52,13 +52,16 @@ func (j Job) Collect(dc *data_collector.DataCollector) (error, bool) {
 	select {
 	case <-ctx.Done():
 		dc.Logger.Printf("\tJob %s has timed out: %s\n---\n", j.Name, ctx.Err())
-		err := fmt.Errorf("Context cancelled: %v", ctx.Err())
-		return err, false
+		return fmt.Errorf("Context cancelled: %v", ctx.Err()), false
 
 	case jobResults := <-ch:
+		if jobResults.Skipped {
+			dc.Logger.Printf("\tJob %s has been skipped\n---\n", j.Name)
+			return nil, true
+		}
 		if jobResults.Error != nil {
 			dc.Logger.Printf("\tJob %s has failed: %s\n", j.Name, jobResults.Error)
-			return jobResults.Error, jobResults.Skipped
+			return jobResults.Error, false
 		}
 
 		for fileName, fileValue := range jobResults.Files {

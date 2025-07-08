@@ -31,11 +31,9 @@ import (
 
 func Execute() {
 
-	var namespaces []string
 	var product string
-	var excludeDBData bool
-	var excludeTimeSeriesData bool
 	var jobList []jobs.Job
+	collector := data_collector.DataCollector{}
 
 	var rootCmd = &cobra.Command{
 		Use:   "nginx-supportpkg",
@@ -43,17 +41,10 @@ func Execute() {
 		Long:  `nginx-supportpkg - a tool to create Ingress Controller diagnostics package`,
 		Run: func(cmd *cobra.Command, args []string) {
 
-			collector, err := data_collector.NewDataCollector(namespaces...)
+			err := data_collector.NewDataCollector(&collector)
 			if err != nil {
 				fmt.Println(fmt.Errorf("unable to start data collector: %s", err))
 				os.Exit(1)
-			}
-
-			if excludeDBData {
-				collector.ExcludeDBData = true
-			}
-			if excludeTimeSeriesData {
-				collector.ExcludeTimeSeriesData = true
 			}
 
 			collector.Logger.Printf("Starting kubectl-nginx-supportpkg - version: %s - build: %s", version.Version, version.Build)
@@ -77,14 +68,14 @@ func Execute() {
 				failedJobs := 0
 				for _, job := range jobList {
 					fmt.Printf("Running job %s...", job.Name)
-					err, Skipped := job.Collect(collector)
+					err, Skipped := job.Collect(&collector)
 					if Skipped {
 						fmt.Print(" SKIPPED\n")
 					} else if err != nil {
-						fmt.Printf(" Error: %s\n", err)
+						fmt.Printf(" FAILED: %s\n", err)
 						failedJobs++
 					} else {
-						fmt.Print(" OK\n")
+						fmt.Print(" COMPLETED\n")
 					}
 				}
 
@@ -107,7 +98,7 @@ func Execute() {
 		},
 	}
 
-	rootCmd.Flags().StringSliceVarP(&namespaces, "namespace", "n", []string{}, "list of namespaces to collect information from")
+	rootCmd.Flags().StringSliceVarP(&collector.Namespaces, "namespace", "n", []string{}, "list of namespaces to collect information from")
 	if err := rootCmd.MarkFlagRequired("namespace"); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -119,8 +110,8 @@ func Execute() {
 		os.Exit(1)
 	}
 
-	rootCmd.Flags().BoolVarP(&excludeDBData, "exclude-db-data", "d", false, "exclude DB data collection")
-	rootCmd.Flags().BoolVarP(&excludeTimeSeriesData, "exclude-time-series-data", "t", false, "exclude time series data collection")
+	rootCmd.Flags().BoolVarP(&collector.ExcludeDBData, "exclude-db-data", "d", false, "exclude DB data collection")
+	rootCmd.Flags().BoolVarP(&collector.ExcludeTimeSeriesData, "exclude-time-series-data", "t", false, "exclude time series data collection")
 
 	versionStr := "nginx-supportpkg - version: " + version.Version + " - build: " + version.Build + "\n"
 	rootCmd.SetVersionTemplate(versionStr)

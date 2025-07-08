@@ -60,16 +60,16 @@ type DataCollector struct {
 	ExcludeTimeSeriesData bool
 }
 
-func NewDataCollector(namespaces ...string) (*DataCollector, error) {
+func NewDataCollector(collector *DataCollector) error {
 
 	tmpDir, err := os.MkdirTemp("", "-pkg-diag")
 	if err != nil {
-		return nil, fmt.Errorf("unable to create temp directory: %s", err)
+		return fmt.Errorf("unable to create temp directory: %s", err)
 	}
 
 	logFile, err := os.OpenFile(filepath.Join(tmpDir, "supportpkg.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create log file: %s", err)
+		return fmt.Errorf("unable to create log file: %s", err)
 	}
 
 	// Find config
@@ -80,30 +80,27 @@ func NewDataCollector(namespaces ...string) (*DataCollector, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeConfig)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to k8s using file %s: %s", kubeConfig, err)
+		return fmt.Errorf("unable to connect to k8s using file %s: %s", kubeConfig, err)
 	}
-
-	dc := DataCollector{
-		BaseDir:          tmpDir,
-		Namespaces:       namespaces,
-		LogFile:          logFile,
-		Logger:           log.New(logFile, "", log.LstdFlags|log.LUTC|log.Lmicroseconds|log.Lshortfile),
-		K8sHelmClientSet: make(map[string]helmClient.Client),
-	}
+	// Set up the DataCollector options
+	collector.BaseDir = tmpDir
+	collector.LogFile = logFile
+	collector.Logger = log.New(logFile, "", log.LstdFlags|log.LUTC|log.Lmicroseconds|log.Lshortfile)
+	collector.K8sHelmClientSet = make(map[string]helmClient.Client)
 
 	//Initialize clients
-	dc.K8sRestConfig = config
-	dc.K8sCoreClientSet, _ = kubernetes.NewForConfig(config)
-	dc.K8sCrdClientSet, _ = crdClient.NewForConfig(config)
-	dc.K8sMetricsClientSet, _ = metricsClient.NewForConfig(config)
-	for _, namespace := range dc.Namespaces {
-		dc.K8sHelmClientSet[namespace], _ = helmClient.NewClientFromRestConf(&helmClient.RestConfClientOptions{
+	collector.K8sRestConfig = config
+	collector.K8sCoreClientSet, _ = kubernetes.NewForConfig(config)
+	collector.K8sCrdClientSet, _ = crdClient.NewForConfig(config)
+	collector.K8sMetricsClientSet, _ = metricsClient.NewForConfig(config)
+	for _, namespace := range collector.Namespaces {
+		collector.K8sHelmClientSet[namespace], _ = helmClient.NewClientFromRestConf(&helmClient.RestConfClientOptions{
 			Options:    &helmClient.Options{Namespace: namespace},
 			RestConfig: config,
 		})
 	}
 
-	return &dc, nil
+	return nil
 }
 
 func (c *DataCollector) WrapUp(product string) (string, error) {
