@@ -20,6 +20,7 @@ package jobs
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -239,15 +240,23 @@ func NIMJobList() []Job {
 
 										// Copy the dumped file from the pod to the host
 										destPathFilename := filepath.Join(dc.BaseDir, "exec", namespace, pod.Name+"__dqlite-dump-"+filepath.Base(config.outputFile))
-										if err := dc.CopyFileFromPod(namespace, pod.Name, config.containerName, config.outputFile, destPathFilename, ctx); err != nil {
+										copyCmd := []string{"cat", config.outputFile}
+										fileContent, err := dc.PodExecutor(namespace, pod.Name, config.containerName, copyCmd, ctx)
+										if err != nil {
 											jobResult.Error = err
 											dc.Logger.Printf("\tFailed to copy dumped file %s from pod %s in namespace %s to %s: %v\n", config.outputFile, pod.Name, namespace, destPathFilename, err)
 										} else {
-											dc.Logger.Printf("\tSuccessfully copied dumped file %s from pod %s in namespace %s to %s\n", config.outputFile, pod.Name, namespace, destPathFilename)
+											err = os.WriteFile(destPathFilename, fileContent, 0644)
+											if err != nil {
+												jobResult.Error = err
+												dc.Logger.Printf("\tFailed to write file to %s: %v\n", destPathFilename, err)
+											} else {
+												dc.Logger.Printf("\tSuccessfully copied dumped file %s from pod %s in namespace %s to %s\n", config.outputFile, pod.Name, namespace, destPathFilename)
+											}
 										}
 
 										// Remove/delete the dumped file from the pod
-										_, err := dc.PodExecutor(namespace, pod.Name, config.containerName, []string{"rm", "-f", config.outputFile}, ctx)
+										_, err = dc.PodExecutor(namespace, pod.Name, config.containerName, []string{"rm", "-f", config.outputFile}, ctx)
 										if err != nil {
 											jobResult.Error = err
 											dc.Logger.Printf("\tFailed to remove dumped file %s from pod %s in namespace %s: %v\n", config.outputFile, pod.Name, namespace, err)
