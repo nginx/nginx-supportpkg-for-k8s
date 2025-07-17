@@ -40,7 +40,7 @@ type JobResult struct {
 	Skipped bool
 }
 
-func (j Job) Collect(dc *data_collector.DataCollector) (error, bool) {
+func (j Job) Collect(dc *data_collector.DataCollector) JobResult {
 	ch := make(chan JobResult, 1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), j.Timeout)
@@ -52,32 +52,32 @@ func (j Job) Collect(dc *data_collector.DataCollector) (error, bool) {
 	select {
 	case <-ctx.Done():
 		dc.Logger.Printf("\tJob %s has timed out: %s\n---\n", j.Name, ctx.Err())
-		return fmt.Errorf("Context cancelled: %v", ctx.Err()), false
+		return JobResult{Error: fmt.Errorf("Context cancelled: %v", ctx.Err()), Skipped: false}
 
 	case jobResults := <-ch:
 		if jobResults.Skipped {
 			dc.Logger.Printf("\tJob %s has been skipped\n---\n", j.Name)
-			return nil, true
+			return JobResult{Error: nil, Skipped: true}
 		}
 		if jobResults.Error != nil {
 			dc.Logger.Printf("\tJob %s has failed: %s\n", j.Name, jobResults.Error)
-			return jobResults.Error, false
+			return JobResult{Error: jobResults.Error, Skipped: false}
 		}
 
 		for fileName, fileValue := range jobResults.Files {
 			err := os.MkdirAll(filepath.Dir(fileName), os.ModePerm)
 			if err != nil {
-				return fmt.Errorf("MkdirAll failed: %v", err), jobResults.Skipped
+				return JobResult{Error: fmt.Errorf("MkdirAll failed: %v", err), Skipped: jobResults.Skipped}
 			}
 			file, _ := os.Create(fileName)
 			_, err = file.Write(fileValue)
 			if err != nil {
-				return fmt.Errorf("Write failed: %v", err), jobResults.Skipped
+				return JobResult{Error: fmt.Errorf("Write failed: %v", err), Skipped: jobResults.Skipped}
 			}
 			_ = file.Close()
 			dc.Logger.Printf("\tJob %s wrote %d bytes to %s\n", j.Name, len(fileValue), fileName)
 		}
 		dc.Logger.Printf("\tJob %s completed successfully\n---\n", j.Name)
-		return nil, jobResults.Skipped
+		return JobResult{Files: jobResults.Files, Error: nil, Skipped: false}
 	}
 }

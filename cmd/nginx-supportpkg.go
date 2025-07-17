@@ -21,7 +21,10 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
+	"strings"
+	"time"
 
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/jobs"
@@ -40,7 +43,7 @@ func Execute() {
 		Short: "nginx-supportpkg - a tool to create Ingress Controller diagnostics package",
 		Long:  `nginx-supportpkg - a tool to create Ingress Controller diagnostics package`,
 		Run: func(cmd *cobra.Command, args []string) {
-
+			startTime := time.Now()
 			err := data_collector.NewDataCollector(&collector)
 			if err != nil {
 				fmt.Println(fmt.Errorf("unable to start data collector: %s", err))
@@ -66,16 +69,59 @@ func Execute() {
 
 			if collector.AllNamespacesExist() {
 				failedJobs := 0
+				totalJobs := len(jobList)
+				var jobTimings []data_collector.JobTiming
+
 				for _, job := range jobList {
 					fmt.Printf("Running job %s...", job.Name)
-					err, Skipped := job.Collect(&collector)
-					if Skipped {
+
+					// Record job start time
+					jobStartTime := time.Now()
+					jobResult := job.Collect(&collector)
+
+					// Record job end time and calculate duration
+					jobEndTime := time.Now()
+					duration := jobEndTime.Sub(jobStartTime)
+
+					// Create job timing record
+					files := make([]string, 0, len(jobResult.Files))
+					for filename := range jobResult.Files {
+						if len(filename) > 0 {
+							packagePath := strings.TrimPrefix(filename, collector.BaseDir)
+							files = append(files, packagePath)
+						}
+					}
+
+					jobTiming := data_collector.JobTiming{
+						Name:      job.Name,
+						StartTime: jobStartTime.UTC().Format(time.RFC3339),
+						EndTime:   jobEndTime.UTC().Format(time.RFC3339),
+						Duration:  duration.String(),
+						Files:     files,
+					}
+
+					if jobResult.Skipped {
 						fmt.Print(" SKIPPED\n")
-					} else if err != nil {
-						fmt.Printf(" FAILED: %s\n", err)
+					} else if jobResult.Error != nil {
+						fmt.Printf(" FAILED: %s\n", jobResult.Error)
 						failedJobs++
 					} else {
 						fmt.Print(" COMPLETED\n")
+					}
+
+					jobTimings = append(jobTimings, jobTiming)
+				}
+
+				// Generate manifest with job timings - UPDATE THIS LINE
+				manifestData, err := collector.GenerateManifest(product, startTime, totalJobs, failedJobs, jobTimings)
+				if err != nil {
+					fmt.Printf("Warning: Failed to generate manifest: %v\n", err)
+				} else {
+					// Save manifest to base directory
+					manifestPath := filepath.Join(collector.BaseDir, "manifest.json")
+					err = os.WriteFile(manifestPath, manifestData, 0644)
+					if err != nil {
+						fmt.Printf("Warning: Failed to write manifest: %v\n", err)
 					}
 				}
 
