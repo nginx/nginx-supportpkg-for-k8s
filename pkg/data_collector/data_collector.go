@@ -110,7 +110,7 @@ type SubPackage struct {
 	ID             string        `json:"id,omitempty"`
 }
 
-type JobTiming struct {
+type JobInfo struct {
 	Name      string   `json:"name"`
 	StartTime string   `json:"start_time"`
 	EndTime   string   `json:"end_time"`
@@ -168,7 +168,7 @@ func (c *DataCollector) WrapUp(product string) (string, error) {
 	unixTime := time.Now().Unix()
 	unixTimeString := strconv.FormatInt(unixTime, 10)
 	tarballName := fmt.Sprintf("%s-supportpkg-%s.tar.gz", product, unixTimeString)
-	tarballRootDirName := fmt.Sprintf("%s-supportpkg-%s", product, unixTimeString)
+	tarballRootDirName := "."
 
 	err := c.LogFile.Close()
 	if err != nil {
@@ -327,12 +327,12 @@ func (c *DataCollector) AllNamespacesExist() bool {
 	return allExist
 }
 
-func (c *DataCollector) GenerateManifest(product string, startTime time.Time, jobsRun, jobsFailed int, jobTimings []JobTiming) ([]byte, error) {
+func (c *DataCollector) GenerateManifest(product string, startTime time.Time, jobsRun, jobsFailed int, jobTimings []JobInfo) ([]byte, error) {
 	manifest := Manifest{
 		Version: "1.2", // Match the schema version
 		Timestamp: TimestampInfo{
-			Start: startTime.UTC().Format(time.RFC3339),
-			Stop:  time.Now().UTC().Format(time.RFC3339),
+			Start: startTime.UTC().Format(time.RFC3339Nano),
+			Stop:  time.Now().UTC().Format(time.RFC3339Nano),
 		},
 		PackageType: "root", // As defined in schema enum
 		RootDir:     ".",

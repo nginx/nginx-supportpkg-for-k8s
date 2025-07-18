@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
@@ -70,49 +69,39 @@ func Execute() {
 			if collector.AllNamespacesExist() {
 				failedJobs := 0
 				totalJobs := len(jobList)
-				var jobTimings []data_collector.JobTiming
+				var jobTimings []data_collector.JobInfo
 
 				for _, job := range jobList {
 					fmt.Printf("Running job %s...", job.Name)
 
-					// Record job start time
+					// Record job start and end time to calculate duration
 					jobStartTime := time.Now()
-					jobResult := job.Collect(&collector)
-
-					// Record job end time and calculate duration
+					err, skipped, files := job.Collect(&collector)
 					jobEndTime := time.Now()
 					duration := jobEndTime.Sub(jobStartTime)
 
-					// Create job timing record
-					files := make([]string, 0, len(jobResult.Files))
-					for filename := range jobResult.Files {
-						if len(filename) > 0 {
-							packagePath := strings.TrimPrefix(filename, collector.BaseDir)
-							files = append(files, packagePath)
-						}
-					}
-
-					jobTiming := data_collector.JobTiming{
+					// Create job info record
+					jobInfo := data_collector.JobInfo{
 						Name:      job.Name,
-						StartTime: jobStartTime.UTC().Format(time.RFC3339),
-						EndTime:   jobEndTime.UTC().Format(time.RFC3339),
+						StartTime: jobStartTime.UTC().Format(time.RFC3339Nano),
+						EndTime:   jobEndTime.UTC().Format(time.RFC3339Nano),
 						Duration:  duration.String(),
 						Files:     files,
 					}
 
-					if jobResult.Skipped {
+					if skipped {
 						fmt.Print(" SKIPPED\n")
-					} else if jobResult.Error != nil {
-						fmt.Printf(" FAILED: %s\n", jobResult.Error)
+					} else if err != nil {
+						fmt.Printf(" FAILED: %s\n", err)
 						failedJobs++
 					} else {
 						fmt.Print(" COMPLETED\n")
 					}
 
-					jobTimings = append(jobTimings, jobTiming)
+					jobTimings = append(jobTimings, jobInfo)
 				}
 
-				// Generate manifest with job timings - UPDATE THIS LINE
+				// Generate manifest with job timings
 				manifestData, err := collector.GenerateManifest(product, startTime, totalJobs, failedJobs, jobTimings)
 				if err != nil {
 					fmt.Printf("Warning: Failed to generate manifest: %v\n", err)
