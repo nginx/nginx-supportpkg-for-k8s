@@ -61,10 +61,6 @@ func (j Job) Collect(dc *data_collector.DataCollector) (error, bool, []string) {
 			dc.Logger.Printf("\tJob %s has been skipped\n---\n", j.Name)
 			return nil, true, files
 		}
-		if jobResults.Error != nil {
-			dc.Logger.Printf("\tJob %s has failed: %s\n", j.Name, jobResults.Error)
-			return jobResults.Error, false, files
-		}
 
 		for fileName, fileValue := range jobResults.Files {
 			err := os.MkdirAll(filepath.Dir(fileName), os.ModePerm)
@@ -79,6 +75,13 @@ func (j Job) Collect(dc *data_collector.DataCollector) (error, bool, []string) {
 			_ = file.Close()
 			dc.Logger.Printf("\tJob %s wrote %d bytes to %s\n", j.Name, len(fileValue), fileName)
 		}
+
+		if jobResults.Error != nil {
+			dc.Logger.Printf("\tJob %s has failed: %s\n", j.Name, jobResults.Error)
+			fmt.Printf("Files collected so far: %v\n", files)
+			return jobResults.Error, false, files
+		}
+
 		dc.Logger.Printf("\tJob %s completed successfully\n---\n", j.Name)
 		return nil, false, files
 	}
