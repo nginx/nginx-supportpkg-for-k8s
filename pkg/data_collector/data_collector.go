@@ -24,9 +24,15 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
 	helmClient "github.com/mittwald/go-helm-client"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
-	"io"
 	corev1 "k8s.io/api/core/v1"
 	crdClient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,35 +44,32 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/homedir"
 	metricsClient "k8s.io/metrics/pkg/client/clientset/versioned"
-	"log"
-	"os"
-	"path/filepath"
-	"strconv"
-	"time"
 )
 
 type DataCollector struct {
-	BaseDir             string
-	Namespaces          []string
-	Logger              *log.Logger
-	LogFile             *os.File
-	K8sRestConfig       *rest.Config
-	K8sCoreClientSet    *kubernetes.Clientset
-	K8sCrdClientSet     *crdClient.Clientset
-	K8sMetricsClientSet *metricsClient.Clientset
-	K8sHelmClientSet    map[string]helmClient.Client
+	BaseDir               string
+	Namespaces            []string
+	Logger                *log.Logger
+	LogFile               *os.File
+	K8sRestConfig         *rest.Config
+	K8sCoreClientSet      *kubernetes.Clientset
+	K8sCrdClientSet       *crdClient.Clientset
+	K8sMetricsClientSet   *metricsClient.Clientset
+	K8sHelmClientSet      map[string]helmClient.Client
+	ExcludeDBData         bool
+	ExcludeTimeSeriesData bool
 }
 
-func NewDataCollector(namespaces ...string) (*DataCollector, error) {
+func NewDataCollector(collector *DataCollector) error {
 
 	tmpDir, err := os.MkdirTemp("", "-pkg-diag")
 	if err != nil {
-		return nil, fmt.Errorf("unable to create temp directory: %s", err)
+		return fmt.Errorf("unable to create temp directory: %s", err)
 	}
 
 	logFile, err := os.OpenFile(filepath.Join(tmpDir, "supportpkg.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create log file: %s", err)
+		return fmt.Errorf("unable to create log file: %s", err)
 	}
 
 	// Find config
@@ -77,30 +80,27 @@ func NewDataCollector(namespaces ...string) (*DataCollector, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeConfig)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to k8s using file %s: %s", kubeConfig, err)
+		return fmt.Errorf("unable to connect to k8s using file %s: %s", kubeConfig, err)
 	}
-
-	dc := DataCollector{
-		BaseDir:          tmpDir,
-		Namespaces:       namespaces,
-		LogFile:          logFile,
-		Logger:           log.New(logFile, "", log.LstdFlags|log.LUTC|log.Lmicroseconds|log.Lshortfile),
-		K8sHelmClientSet: make(map[string]helmClient.Client),
-	}
+	// Set up the DataCollector options
+	collector.BaseDir = tmpDir
+	collector.LogFile = logFile
+	collector.Logger = log.New(logFile, "", log.LstdFlags|log.LUTC|log.Lmicroseconds|log.Lshortfile)
+	collector.K8sHelmClientSet = make(map[string]helmClient.Client)
 
 	//Initialize clients
-	dc.K8sRestConfig = config
-	dc.K8sCoreClientSet, _ = kubernetes.NewForConfig(config)
-	dc.K8sCrdClientSet, _ = crdClient.NewForConfig(config)
-	dc.K8sMetricsClientSet, _ = metricsClient.NewForConfig(config)
-	for _, namespace := range dc.Namespaces {
-		dc.K8sHelmClientSet[namespace], _ = helmClient.NewClientFromRestConf(&helmClient.RestConfClientOptions{
+	collector.K8sRestConfig = config
+	collector.K8sCoreClientSet, _ = kubernetes.NewForConfig(config)
+	collector.K8sCrdClientSet, _ = crdClient.NewForConfig(config)
+	collector.K8sMetricsClientSet, _ = metricsClient.NewForConfig(config)
+	for _, namespace := range collector.Namespaces {
+		collector.K8sHelmClientSet[namespace], _ = helmClient.NewClientFromRestConf(&helmClient.RestConfClientOptions{
 			Options:    &helmClient.Options{Namespace: namespace},
 			RestConfig: config,
 		})
 	}
 
-	return &dc, nil
+	return nil
 }
 
 func (c *DataCollector) WrapUp(product string) (string, error) {
@@ -199,18 +199,19 @@ func (c *DataCollector) WrapUp(product string) (string, error) {
 	return tarballName, nil
 }
 
-func (c *DataCollector) PodExecutor(namespace string, pod string, command []string, ctx context.Context) ([]byte, error) {
+func (c *DataCollector) PodExecutor(namespace string, pod string, container string, command []string, ctx context.Context) ([]byte, error) {
 	req := c.K8sCoreClientSet.CoreV1().RESTClient().Post().
 		Namespace(namespace).
 		Resource("pods").
 		Name(pod).
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
-			Command: command,
-			Stdin:   false,
-			Stdout:  true,
-			Stderr:  true,
-			TTY:     true,
+			Command:   command,
+			Container: container,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       true,
 		}, scheme.ParameterCodec)
 
 	exec, err := remotecommand.NewSPDYExecutor(c.K8sRestConfig, "POST", req.URL())
@@ -240,7 +241,6 @@ func (c *DataCollector) QueryCRD(crd crds.Crd, namespace string, ctx context.Con
 	c.K8sRestConfig.NegotiatedSerializer = negotiatedSerializer
 
 	client, err := rest.RESTClientFor(c.K8sRestConfig)
-
 	if err != nil {
 		return nil, err
 	}

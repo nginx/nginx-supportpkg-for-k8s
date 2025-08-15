@@ -24,7 +24,7 @@ type Crd struct {
 	Version  string
 }
 
-func GetCRDList() []Crd {
+func GetNICCRDList() []Crd {
 	crdList := []Crd{
 		{
 			Resource: "apdoslogconfs",
@@ -80,6 +80,32 @@ func GetCRDList() []Crd {
 			Resource: "virtualservers",
 			Group:    "k8s.nginx.org",
 			Version:  "v1",
+		},
+	}
+	return crdList
+}
+
+func GetNGFCRDList() []Crd {
+	crdList := []Crd{
+		{
+			Resource: "clientsettingspolicies",
+			Group:    "gateway.nginx.org",
+			Version:  "v1alpha1",
+		},
+		{
+			Resource: "nginxgateways",
+			Group:    "gateway.nginx.org",
+			Version:  "v1alpha1",
+		},
+		{
+			Resource: "nginxproxies",
+			Group:    "gateway.nginx.org",
+			Version:  "v1alpha1",
+		},
+		{
+			Resource: "observabilitypolicies",
+			Group:    "gateway.nginx.org",
+			Version:  "v1alpha1",
 		},
 	}
 	return crdList

@@ -1,10 +1,17 @@
+[![OpenSSFScorecard](https://api.securityscorecards.dev/projects/github.com/nginxinc/nginx-supportpkg-for-k8s/badge)](https://scorecard.dev/viewer/?uri=github.com/nginxinc/nginx-supportpkg-for-k8s)
+[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B5618%2Fgithub.com%2Fnginxinc%2Fnginx-supportpkg-for-k8s.svg?type=shield)](https://app.fossa.com/projects/custom%2B5618%2Fgithub.com%2Fnginxinc%2Fnginx-supportpkg-for-k8s?ref=badge_shield)
+[![Go Report Card](https://goreportcard.com/badge/github.com/nginxinc/nginx-supportpkg-for-k8s)](https://goreportcard.com/report/github.com/nginxinc/nginx-supportpkg-for-k8s)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/nginxinc/nginx-supportpkg-for-k8s?logo=go)
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+
+
 # nginx-supportpkg-for-k8s
 
 A kubectl plugin designed to collect diagnostics information on any NGINX product running on k8s. 
 
 ## Supported products
 
-Currently, [NIC](https://github.com/nginxinc/kubernetes-ingress) is the only supported product.
+Currently, [NIC](https://github.com/nginxinc/kubernetes-ingress), [NGF](https://github.com/nginxinc/nginx-gateway-fabric) and [NGINX (OSS/NPLUS) in containers](https://github.com/nginx/nginx) are the supported products.
 
 ## Features
 

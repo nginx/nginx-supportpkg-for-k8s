@@ -9,37 +9,37 @@ spec:
       matchLabels:
         os: linux
         arch: arm64
-    {{addURIAndSha "https://github.com/nginxinc/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_linux_arm64.tar.gz" .TagName }}
+    {{addURIAndSha "https://github.com/nginx/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_linux_arm64.tar.gz" .TagName }}
     bin: kubectl-nginx_supportpkg
   - selector:
       matchLabels:
         os: linux
         arch: amd64
-    {{addURIAndSha "https://github.com/nginxinc/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_linux_amd64.tar.gz" .TagName }}
+    {{addURIAndSha "https://github.com/nginx/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_linux_amd64.tar.gz" .TagName }}
     bin: kubectl-nginx_supportpkg
   - selector:
       matchLabels:
         os: darwin
         arch: arm64
-    {{addURIAndSha "https://github.com/nginxinc/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_darwin_arm64.tar.gz" .TagName}}
+    {{addURIAndSha "https://github.com/nginx/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_darwin_arm64.tar.gz" .TagName}}
     bin: kubectl-nginx_supportpkg
   - selector:
       matchLabels:
         os: darwin
         arch: amd64
-    {{addURIAndSha "https://github.com/nginxinc/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_darwin_amd64.tar.gz" .TagName }}
+    {{addURIAndSha "https://github.com/nginx/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_darwin_amd64.tar.gz" .TagName }}
     bin: kubectl-nginx_supportpkg
   - selector:
       matchLabels:
         os: windows
         arch: amd64
-    {{addURIAndSha "https://github.com/nginxinc/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_windows_amd64.tar.gz" .TagName }}
+    {{addURIAndSha "https://github.com/nginx/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_windows_amd64.tar.gz" .TagName }}
     bin: kubectl-nginx_supportpkg
   - selector:
       matchLabels:
         os: windows
         arch: arm64
-    {{addURIAndSha "https://github.com/nginxinc/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_windows_arm64.tar.gz" .TagName }}
+    {{addURIAndSha "https://github.com/nginx/nginx-supportpkg-for-k8s/releases/download/{{ .TagName }}/kubectl-nginx_supportpkg_{{ .TagName }}_windows_arm64.tar.gz" .TagName }}
     bin: kubectl-nginx_supportpkg
   shortDescription: Collect support packages for NGINX products that run on k8s
   homepage: https://github.com/nginxinc/nginx-supportpkg-for-k8s
