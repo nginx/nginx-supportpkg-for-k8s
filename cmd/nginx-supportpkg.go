@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
@@ -70,10 +71,16 @@ func Execute() {
 				failedJobs := 0
 				totalJobs := len(jobList)
 				var jobTimings []data_collector.JobInfo
+				const jobNameWidth = 30
 
 				for _, job := range jobList {
-					fmt.Printf("Running job %s...", job.Name)
-
+					fmt.Printf("Running job %s", job.Name)
+					// Calculate number of dots needed
+					dots := jobNameWidth - len(job.Name)
+					if dots < 0 {
+						dots = 0
+					}
+					fmt.Printf("%s ", strings.Repeat(".", dots))
 					// Record job start and end time to calculate duration
 					jobStartTime := time.Now()
 					err, skipped, files := job.Collect(&collector)
