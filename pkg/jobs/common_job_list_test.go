@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,7 +112,7 @@ func TestCommonJobList_SelectedJobsProduceFiles(t *testing.T) {
 				if len(content) == 0 {
 					t.Fatalf("job %s file %s has empty content", job.Name, path)
 				}
-				if !filepath.HasPrefix(path, dc.BaseDir) { // acceptable here; test code (Go <1.22 deprecation not critical)
+				if !strings.HasPrefix(filepath.ToSlash(path), filepath.ToSlash(dc.BaseDir)) {
 					t.Fatalf("job %s file path %s does not start with basedir %s", job.Name, path, dc.BaseDir)
 				}
 			}

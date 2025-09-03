@@ -110,7 +110,7 @@ func TestNICJobList_CRDObjects(t *testing.T) {
 					t.Errorf("CRD job returned error: %v", result.Error)
 				}
 				for file, content := range result.Files {
-					if !filepath.HasPrefix(file, tmpDir) {
+					if !strings.HasPrefix(filepath.ToSlash(file), filepath.ToSlash(tmpDir)) {
 						t.Errorf("File path %s does not start with tmpDir", file)
 					}
 					var out map[string]interface{}
