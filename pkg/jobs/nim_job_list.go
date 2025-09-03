@@ -20,7 +20,6 @@ package jobs
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -246,13 +245,7 @@ func NIMJobList() []Job {
 											jobResult.Error = err
 											dc.Logger.Printf("\tFailed to copy dumped file %s from pod %s in namespace %s to %s: %v\n", config.outputFile, pod.Name, namespace, destPathFilename, err)
 										} else {
-											err = os.WriteFile(destPathFilename, fileContent, 0644)
-											if err != nil {
-												jobResult.Error = err
-												dc.Logger.Printf("\tFailed to write file to %s: %v\n", destPathFilename, err)
-											} else {
-												dc.Logger.Printf("\tSuccessfully copied dumped file %s from pod %s in namespace %s to %s\n", config.outputFile, pod.Name, namespace, destPathFilename)
-											}
+											jobResult.Files[destPathFilename] = fileContent
 										}
 
 										// Remove/delete the dumped file from the pod

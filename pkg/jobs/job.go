@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
@@ -40,7 +41,7 @@ type JobResult struct {
 	Skipped bool
 }
 
-func (j Job) Collect(dc *data_collector.DataCollector) (error, bool) {
+func (j Job) Collect(dc *data_collector.DataCollector) (error, bool, []string) {
 	ch := make(chan JobResult, 1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), j.Timeout)
@@ -52,32 +53,47 @@ func (j Job) Collect(dc *data_collector.DataCollector) (error, bool) {
 	select {
 	case <-ctx.Done():
 		dc.Logger.Printf("\tJob %s has timed out: %s\n---\n", j.Name, ctx.Err())
-		return fmt.Errorf("Context cancelled: %v", ctx.Err()), false
+		return fmt.Errorf("Context cancelled: %v", ctx.Err()), false, nil
 
 	case jobResults := <-ch:
+		files := j.GetFilesFromJobResult(dc, jobResults)
 		if jobResults.Skipped {
 			dc.Logger.Printf("\tJob %s has been skipped\n---\n", j.Name)
-			return nil, true
-		}
-		if jobResults.Error != nil {
-			dc.Logger.Printf("\tJob %s has failed: %s\n", j.Name, jobResults.Error)
-			return jobResults.Error, false
+			return nil, true, files
 		}
 
 		for fileName, fileValue := range jobResults.Files {
 			err := os.MkdirAll(filepath.Dir(fileName), os.ModePerm)
 			if err != nil {
-				return fmt.Errorf("MkdirAll failed: %v", err), jobResults.Skipped
+				return fmt.Errorf("MkdirAll failed: %v", err), jobResults.Skipped, files
 			}
 			file, _ := os.Create(fileName)
 			_, err = file.Write(fileValue)
 			if err != nil {
-				return fmt.Errorf("Write failed: %v", err), jobResults.Skipped
+				return fmt.Errorf("Write failed: %v", err), jobResults.Skipped, files
 			}
 			_ = file.Close()
 			dc.Logger.Printf("\tJob %s wrote %d bytes to %s\n", j.Name, len(fileValue), fileName)
 		}
+
+		if jobResults.Error != nil {
+			dc.Logger.Printf("\tJob %s has failed: %s\n", j.Name, jobResults.Error)
+			fmt.Printf("Files collected so far: %v\n", files)
+			return jobResults.Error, false, files
+		}
+
 		dc.Logger.Printf("\tJob %s completed successfully\n---\n", j.Name)
-		return nil, jobResults.Skipped
+		return nil, false, files
 	}
+}
+
+func (j Job) GetFilesFromJobResult(dc *data_collector.DataCollector, jobResult JobResult) []string {
+	files := make([]string, 0, len(jobResult.Files))
+	for filename := range jobResult.Files {
+		if len(filename) > 0 {
+			packagePath := strings.TrimPrefix(filename, dc.BaseDir)
+			files = append(files, packagePath)
+		}
+	}
+	return files
 }
