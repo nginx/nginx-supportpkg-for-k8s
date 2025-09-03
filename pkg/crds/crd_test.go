@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestGetCRDList(t *testing.T) {
+func TestGetNICCRDList(t *testing.T) {
 	tests := []struct {
 		name string
 		want []Crd
@@ -74,8 +74,8 @@ func TestGetCRDList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetCRDList(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetCRDList() = %v, want %v", got, tt.want)
+			if got := GetNICCRDList(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetNICCRDList() = %v, want %v", got, tt.want)
 			}
 		})
 	}
