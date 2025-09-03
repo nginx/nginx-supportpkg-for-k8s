@@ -37,7 +37,7 @@ func TestJobCollect_Success(t *testing.T) {
 		},
 	}
 
-	err, skipped := job.Collect(dc)
+	err, skipped, _ := job.Collect(dc)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -67,7 +67,7 @@ func TestJobCollect_Skipped(t *testing.T) {
 			ch <- JobResult{Skipped: true}
 		},
 	}
-	err, skipped := job.Collect(dc)
+	err, skipped, _ := job.Collect(dc)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -89,7 +89,7 @@ func TestJobCollect_Error(t *testing.T) {
 			ch <- JobResult{Error: errors.New("fail")}
 		},
 	}
-	err, skipped := job.Collect(dc)
+	err, skipped, _ := job.Collect(dc)
 	if err == nil || err.Error() != "fail" {
 		t.Fatalf("expected error 'fail', got %v", err)
 	}
@@ -112,7 +112,7 @@ func TestJobCollect_Timeout(t *testing.T) {
 			ch <- JobResult{}
 		},
 	}
-	err, skipped := job.Collect(dc)
+	err, skipped, _ := job.Collect(dc)
 	if err == nil {
 		t.Fatalf("expected timeout error, got nil")
 	}
