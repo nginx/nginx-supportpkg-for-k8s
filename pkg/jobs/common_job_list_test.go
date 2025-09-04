@@ -125,9 +125,10 @@ func TestCommonJobList_SelectedJobsProduceFiles(t *testing.T) {
 func TestCommonJobList_PodListJSONKeyPresence(t *testing.T) {
 	dc := setupDataCollector(t)
 	var podListJob *Job
-	for i, j := range CommonJobList() {
+	jobs := CommonJobList()
+	for i, j := range jobs {
 		if j.Name == "pod-list" {
-			podListJob = &CommonJobList()[i]
+			podListJob = &jobs[i]
 			break
 		}
 	}
