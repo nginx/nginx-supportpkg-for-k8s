@@ -146,7 +146,7 @@ func CommonJobList() []Job {
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
 				for _, namespace := range dc.Namespaces {
-					result, err := dc.K8sCoreClientSet.DiscoveryClient.ServerPreferredResources()
+					result, err := dc.K8sCoreClientSet.Discovery().ServerPreferredResources()
 					if err != nil {
 						dc.Logger.Printf("\tCould not retrieve API resources list %s: %v\n", namespace, err)
 					} else {
@@ -163,7 +163,7 @@ func CommonJobList() []Job {
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
 				for _, namespace := range dc.Namespaces {
-					result, err := dc.K8sCoreClientSet.DiscoveryClient.ServerGroups()
+					result, err := dc.K8sCoreClientSet.Discovery().ServerGroups()
 					if err != nil {
 						dc.Logger.Printf("\tCould not retrieve API versions list %s: %v\n", namespace, err)
 					} else {
@@ -367,7 +367,7 @@ func CommonJobList() []Job {
 			Timeout: time.Second * 10,
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
-				result, err := dc.K8sCoreClientSet.ServerVersion()
+				result, err := dc.K8sCoreClientSet.Discovery().ServerVersion()
 				if err != nil {
 					dc.Logger.Printf("\tCould not retrieve server version: %v\n", err)
 				} else {
