@@ -51,10 +51,6 @@ func TestNGFJobExecNginxGatewayVersion(t *testing.T) {
 		},
 	})
 
-	// TODO: Add test logic for exec-nginx-t job here.
-
-	// TODO: Add test logic for exec-nginx-t job here.
-
 	dc := &data_collector.DataCollector{
 		BaseDir:          tmpDir,
 		Namespaces:       []string{"default"},
