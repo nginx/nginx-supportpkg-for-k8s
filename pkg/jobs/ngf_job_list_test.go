@@ -110,7 +110,6 @@ func TestNGFJobExecNginxT(t *testing.T) {
 		},
 	})
 
-	// TODO: Add test logic for exec-nginx-t job here.
 	dc := &data_collector.DataCollector{
 		BaseDir:          tmpDir,
 		Namespaces:       []string{"default"},
