@@ -54,7 +54,7 @@ type DataCollector struct {
 	Logger                *log.Logger
 	LogFile               *os.File
 	K8sRestConfig         *rest.Config
-	K8sCoreClientSet      kubernetes.Interface //*kubernetes.Clientset
+	K8sCoreClientSet      kubernetes.Interface
 	K8sCrdClientSet       *crdClient.Clientset
 	K8sMetricsClientSet   *metricsClient.Clientset
 	K8sHelmClientSet      map[string]helmClient.Client
