@@ -27,7 +27,6 @@ func mockQueryCRD(crd crds.Crd, namespace string, ctx context.Context) ([]byte, 
 	return json.Marshal(map[string]string{"kind": crd.Resource})
 }
 
-// (Removed custom fake types; use fake.NewSimpleClientset instead)
 func TestNICJobList_ExecJobs(t *testing.T) {
 	tmpDir := t.TempDir()
 	dc := &data_collector.DataCollector{
