@@ -13,11 +13,6 @@ import (
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
 )
 
-// mockLogger implements the minimal Printf interface for testing
-// type mockLogger struct{}
-
-// func (l *mockLogger) Printf(format string, v ...interface{}) {}
-
 // Test successful job execution and file writing
 func TestJobCollect_Success(t *testing.T) {
 	tmpDir := t.TempDir()
