@@ -27,23 +27,7 @@ func mockQueryCRD(crd crds.Crd, namespace string, ctx context.Context) ([]byte, 
 	return json.Marshal(map[string]string{"kind": crd.Resource})
 }
 
-// Mock K8sCoreClientSet to return fake pods
-type FakePodInterface struct {
-	ListFunc func(ctx context.Context, opts metav1.ListOptions) (*corev1.PodList, error)
-}
-
-func (f *FakePodInterface) List(ctx context.Context, opts metav1.ListOptions) (*corev1.PodList, error) {
-	return f.ListFunc(ctx, opts)
-}
-
-type FakeCoreClientSet struct {
-	PodsFunc func(namespace string) *FakePodInterface
-}
-
-func (f *FakeCoreClientSet) Pods(namespace string) *FakePodInterface {
-	return f.PodsFunc(namespace)
-}
-
+// (Removed custom fake types; use fake.NewSimpleClientset instead)
 func TestNICJobList_ExecJobs(t *testing.T) {
 	tmpDir := t.TempDir()
 	dc := &data_collector.DataCollector{
