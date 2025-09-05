@@ -92,4 +92,7 @@ Running job helm-info... OK
 Running job helm-deployments... OK
 Supportpkg successfully generated: nic-supportpkg-1711384966.tar.gz
 
-```
+```  
+
+## The nginx-utils Package
+Please refer to its dedicated [README](/nginx-utils/README.md).
