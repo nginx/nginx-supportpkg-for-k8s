@@ -43,7 +43,7 @@ API_VERSION: 9
 ```  
 
 # Building
-Please go the root directory of this project, `nginx-supportpkg-for-k8s` and run the command:
+Please go to the root directory of this project, `nginx-supportpkg-for-k8s` and run the command:
 ```
 make nginx-utils
 ```
