@@ -1,5 +1,5 @@
 # Introduction
-The `kubectl` command of kubernetes offers a `debug` sub-command to investigate pods running (or crashing) on a node using ephemeral debug containers.  
+The `kubectl` command of Kubernetes offers a `debug` sub-command to investigate pods running (or crashing) on a node using ephemeral debug containers.  
 The `nginx-utils` image can be spun into a debug container that includes various tools such as curl, tcpdump, iperf, netcat to name a few.  
 
 Benefits:  
