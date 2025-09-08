@@ -13,7 +13,7 @@ Benefits:
 ```
 ns=v4nic-0
 pod=$(kubectl get po -n $ns -o name | awk -F '/' '{print $2}')
-kubectl -n $ns debug -it $pod --image=ghcr.io/nginx/nginx-utils:v0.0.1-docker --target=nginx-ingress
+kubectl -n $ns debug -it $pod --image=ghcr.io/nginx/nginx-utils:latest --target=nginx-ingress
 ```
 
 Please refer to the [nginx-utils packages page](https://github.com/nginx/nginx-supportpkg-for-k8s/pkgs/container/nginx-utils) for versions.  
@@ -21,7 +21,7 @@ Please refer to the [nginx-utils packages page](https://github.com/nginx/nginx-s
 --------------
 #### Example usage of `api_stats.sh` found in the container:  
 ```
-kubectl -n $ns debug -it $pod --image=ghcr.io/nginx/nginx-utils:v0.0.1-docker --target=nginx-ingress
+kubectl -n $ns debug -it $pod --image=ghcr.io/nginx/nginx-utils:latest --target=nginx-ingress
 
 v4nic-0-nginx-ingress-controller-854796ff97-hhkk5:~# ls
 api_stats.sh     memory_stats.sh
