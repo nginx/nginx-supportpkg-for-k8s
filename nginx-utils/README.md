@@ -9,7 +9,7 @@ Benefits:
 * Ability to include custom tools  
 
 # Usage
-#### The command to start the debug container using the nginx-utils image version `ghcr.io/nginx/nginx-utils:v0.0.1-docker`:  
+#### The command to start the debug container using the nginx-utils image version `ghcr.io/nginx/nginx-utils:latest`:  
 ```
 kubectl -n <namespace> debug -it <nic-pod-name> --image=ghcr.io/nginx/nginx-utils:latest --target=nginx-ingress
 ```
