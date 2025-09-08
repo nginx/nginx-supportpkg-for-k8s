@@ -20,7 +20,7 @@ Please refer to the [nginx-utils packages page](https://github.com/nginx/nginx-s
 #### Example usage of `api_stats.sh` found in the container:
 The `api_stats.sh` script is designed to facilitate accessing the [/api](https://nginx.org/en/docs/http/ngx_http_api_module.html#api) endpoint to query various status information, configuring upstream server groups on-the-fly, and managing key-value pairs without the need of reconfiguring nginx.
 
-<font color="red">NOTE</font>: The `api_stats.sh` script requires an `/api` endpoint that is listening on `loopback`, in a given `port`.
+> **NOTE:** The `api_stats.sh` script requires an `/api` endpoint that is listening on `loopback`, in a given `port`.
 ```
 kubectl -n <namespace> debug -it <nic-pod-name> --image=ghcr.io/nginx/nginx-utils:latest --target=nginx-ingress
 
