@@ -3,7 +3,7 @@ module github.com/nginxinc/nginx-k8s-supportpkg
 go 1.24.3
 
 require (
-	github.com/mittwald/go-helm-client v0.12.17
+	github.com/mittwald/go-helm-client v0.12.18
 	github.com/spf13/cobra v1.10.1
 	k8s.io/client-go v0.34.0
 )
