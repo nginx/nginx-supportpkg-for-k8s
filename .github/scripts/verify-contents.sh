@@ -16,18 +16,6 @@ if [ ! -d "$EXTRACTED_DIR" ]; then
     exit 1
 fi
 
-# Find the actual supportpkg directory (it should be nested)
-SUPPORTPKG_DIR=$(find "$EXTRACTED_DIR" -maxdepth 2 -type d -name "*supportpkg*" | head -n 1)
-
-if [ -z "$SUPPORTPKG_DIR" ]; then
-    echo "Error: Could not find supportpkg directory in extracted contents"
-    echo "Available directories:"
-    find "$EXTRACTED_DIR" -type d | head -20
-    exit 1
-fi
-
-echo "Found supportpkg directory: $SUPPORTPKG_DIR"
-
 # List of expected files/directories based on the common and NIC job lists
 EXPECTED_ITEMS=(
     "manifest.json"
@@ -59,7 +47,7 @@ MISSING_ITEMS=()
 FOUND_ITEMS=()
 
 for item in "${EXPECTED_ITEMS[@]}"; do
-    FULL_PATH="$SUPPORTPKG_DIR/$item"
+    FULL_PATH="$EXTRACTED_DIR/$item"
     if [ -e "$FULL_PATH" ]; then
         FOUND_ITEMS+=("$item")
         echo "✓ Found: $item"
@@ -71,7 +59,7 @@ done
 
 # Check optional items
 for item in "${OPTIONAL_ITEMS[@]}"; do
-    FULL_PATH="$SUPPORTPKG_DIR/$item"
+    FULL_PATH="$EXTRACTED_DIR/$item"
     if [ -e "$FULL_PATH" ]; then
         echo "✓ Found optional: $item"
     else
@@ -80,7 +68,7 @@ for item in "${OPTIONAL_ITEMS[@]}"; do
 done
 
 # Check if logs directory contains pod logs
-LOGS_DIR="$SUPPORTPKG_DIR/logs/nginx-ingress"
+LOGS_DIR="$EXTRACTED_DIR/logs/nginx-ingress"
 if [ -d "$LOGS_DIR" ]; then
     LOG_COUNT=$(find "$LOGS_DIR" -name "*.txt" | wc -l)
     if [ "$LOG_COUNT" -gt 0 ]; then
@@ -94,7 +82,7 @@ if [ -d "$LOGS_DIR" ]; then
 fi
 
 # Check if manifest.json is valid JSON and contains expected fields
-MANIFEST_FILE="$SUPPORTPKG_DIR/manifest.json"
+MANIFEST_FILE="$EXTRACTED_DIR/manifest.json"
 if [ -f "$MANIFEST_FILE" ]; then
     if jq empty "$MANIFEST_FILE" 2>/dev/null; then
         echo "✓ manifest.json is valid JSON"
@@ -122,7 +110,7 @@ if [ -f "$MANIFEST_FILE" ]; then
 fi
 
 # Check for kubernetes resource files content
-PODS_FILE="$SUPPORTPKG_DIR/resources/nginx-ingress/pods.json"
+PODS_FILE="$EXTRACTED_DIR/resources/nginx-ingress/pods.json"
 if [ -f "$PODS_FILE" ]; then
     if jq empty "$PODS_FILE" 2>/dev/null; then
         POD_COUNT=$(jq '.items | length' "$PODS_FILE" 2>/dev/null || echo "0")
@@ -143,7 +131,7 @@ if [ ${#MISSING_ITEMS[@]} -eq 0 ]; then
     echo "✅ All expected items found!"
     echo ""
     echo "Complete directory structure:"
-    find "$SUPPORTPKG_DIR" -type f | sort | sed 's/^/  /'
+    find "$EXTRACTED_DIR" -type f | sort | sed 's/^/  /'
     exit 0
 else
     echo "❌ Some expected items are missing:"
@@ -152,6 +140,6 @@ else
     done
     echo ""
     echo "Actual directory structure:"
-    find "$SUPPORTPKG_DIR" -type f | sort | sed 's/^/  /'
+    find "$EXTRACTED_DIR" -type f | sort | sed 's/^/  /'
     exit 1
 fi
