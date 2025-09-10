@@ -1,0 +1,116 @@
+name: Integration Test
+
+on:
+  push:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+
+    - name: Build binary
+      run: |
+        go build -o nginx-supportpkg main.go
+        chmod +x nginx-supportpkg
+
+    - name: Create KinD cluster
+      uses: helm/kind-action@v1.12.0
+      with:
+        cluster_name: test-cluster
+        config: .github/kind-config.yaml
+
+    - name: Wait for cluster to be ready
+      run: |
+        kubectl wait --for=condition=Ready nodes --all --timeout=300s
+        kubectl cluster-info
+
+    - name: Install NGINX Ingress Controller with Helm
+      run: |
+        # Install Helm (it's pre-installed on GitHub runners but ensure latest version)
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        
+        # Add and update helm repos (if needed)
+        helm version
+        
+        # Install NGINX Ingress Controller
+        helm install my-release oci://ghcr.io/nginx/charts/nginx-ingress --version 2.2.2 \
+          --namespace nginx-ingress --create-namespace
+        
+        # Verify installation
+        kubectl get pods -n nginx-ingress
+
+    - name: Wait for NGINX Ingress Controller to be ready
+      run: |
+        kubectl wait --namespace nginx-ingress \
+          --for=condition=ready pod \
+          --selector=app.kubernetes.io/instance=my-release \
+          --timeout=300s
+        kubectl get pods -A
+
+    - name: Run nginx-supportpkg tool
+      run: |
+        ./nginx-supportpkg -n nginx-ingress -p nic
+
+    - name: Verify output file exists
+      run: |
+        ls -la *.tar.gz
+        if [ ! -f *.tar.gz ]; then
+          echo "Error: No tarball file found"
+          exit 1
+        fi
+        echo "Tarball found: $(ls *.tar.gz)"
+
+    - name: Verify tarball is valid
+      run: |
+        TARBALL=$(ls *.tar.gz | head -n 1)
+        echo "Testing tarball: $TARBALL"
+        
+        # Test if it's a valid gzipped tarball
+        if ! gzip -t "$TARBALL"; then
+          echo "Error: File is not a valid gzip file"
+          exit 1
+        fi
+        
+        # Test if it's a valid tar archive
+        if ! tar -tzf "$TARBALL" >/dev/null 2>&1; then
+          echo "Error: File is not a valid tar archive"
+          exit 1
+        fi
+        
+        echo "Tarball is valid"
+
+    - name: Extract and verify contents
+      run: |
+        TARBALL=$(ls *.tar.gz | head -n 1)
+        echo "Extracting tarball: $TARBALL"
+        
+        # Extract to a test directory
+        mkdir -p extracted_test
+        tar -xzf "$TARBALL" -C extracted_test
+        
+        # List all extracted contents
+        echo "Extracted contents:"
+        find extracted_test -type f | sort
+        
+        # Verify expected files exist
+        bash .github/scripts/verify-contents.sh extracted_test
+
+    - name: Upload test artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-test-artifacts
+        path: |
+          *.tar.gz
+          extracted_test/
