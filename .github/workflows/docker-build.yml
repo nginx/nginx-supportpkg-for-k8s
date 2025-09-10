@@ -21,7 +21,7 @@ jobs:
         run: echo "Starting Release Build for ${RELEASE_VERSION}"
         
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5
 
       - name: List repository files
         run: ls -R .; pwd
