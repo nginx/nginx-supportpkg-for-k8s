@@ -36,6 +36,7 @@ import (
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/version"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdClient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,8 +56,8 @@ type DataCollector struct {
 	LogFile               *os.File
 	K8sRestConfig         *rest.Config
 	K8sCoreClientSet      kubernetes.Interface
-	K8sCrdClientSet       *crdClient.Clientset
-	K8sMetricsClientSet   *metricsClient.Clientset
+	K8sCrdClientSet       apiextensionsclientset.Interface
+	K8sMetricsClientSet   metricsClient.Interface
 	K8sHelmClientSet      map[string]helmClient.Client
 	ExcludeDBData         bool
 	ExcludeTimeSeriesData bool

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
+	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/release"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -17,7 +19,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	helmclient "github.com/mittwald/go-helm-client"
+	mockHelmClient "github.com/mittwald/go-helm-client/mock"
+	"go.uber.org/mock/gomock"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsfake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
+	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 )
 
 // helper creates int32 ptr
@@ -64,34 +74,67 @@ func setupDataCollector(t *testing.T) *data_collector.DataCollector {
 	}
 
 	client := fake.NewSimpleClientset(objs...)
+	// Mock rest.Config
+	restConfig := &rest.Config{
+		Host: "https://mock-k8s-server",
+	}
+
+	// Create a CRD clientset (using the real clientset, but not actually connecting)
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "testcrd.example.com",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "example.com",
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Kind:     "TestCRD",
+				Plural:   "testcrds",
+				Singular: "testcrd",
+			},
+			Scope: apiextensionsv1.NamespaceScoped,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+				},
+			},
+		},
+	}
+	// crdClient := &apiextensionsclientset.Clientset{}
+	crdClient := apiextensionsfake.NewSimpleClientset(crd)
+	metricsClient := metricsfake.NewSimpleClientset()
+	// helmClient := &FakeHelmClient{}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	helmClient := mockHelmClient.NewMockClient(ctrl)
+	if helmClient == nil {
+		t.Fail()
+	}
+	helmClient.EXPECT().GetSettings().Return(&cli.EnvSettings{}).AnyTimes()
+	var mockedRelease = release.Release{Name: "test", Namespace: "test", Manifest: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: example-config\n  namespace: default\ndata:\n  key: value\n"}
+	helmClient.EXPECT().ListDeployedReleases().Return([]*release.Release{&mockedRelease}, nil).AnyTimes()
 
 	return &data_collector.DataCollector{
-		BaseDir:          tmpDir,
-		Namespaces:       []string{"default"},
-		Logger:           log.New(io.Discard, "", 0),
-		K8sCoreClientSet: client,
+		BaseDir:             tmpDir,
+		Namespaces:          []string{"default"},
+		Logger:              log.New(io.Discard, "", 0),
+		K8sCoreClientSet:    client,
+		K8sCrdClientSet:     crdClient,
+		K8sRestConfig:       restConfig,
+		K8sMetricsClientSet: metricsClient,
+		K8sHelmClientSet:    map[string]helmclient.Client{"default": helmClient},
+
 		// Leave other client sets nil; we will not execute jobs that depend on them in this focused test.
 	}
 }
 
 func TestCommonJobList_SelectedJobsProduceFiles(t *testing.T) {
 	dc := setupDataCollector(t)
-
-	// Jobs we explicitly validate (keep focused; others require additional fake clients)
-	targetJobs := map[string]struct{}{
-		"pod-list":        {},
-		"service-list":    {},
-		"deployment-list": {},
-		"roles-list":      {},
-		"configmap-list":  {},
-	}
-
 	jobList := CommonJobList()
 
 	for _, job := range jobList {
-		if _, ok := targetJobs[job.Name]; !ok {
-			continue
-		}
 
 		ch := make(chan JobResult, 1)
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
