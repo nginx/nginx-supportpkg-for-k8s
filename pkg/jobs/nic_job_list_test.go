@@ -3,15 +3,13 @@ package jobs
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"log"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
-	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -28,12 +26,9 @@ func mockQueryCRD(crd crds.Crd, namespace string, ctx context.Context) ([]byte, 
 }
 
 func TestNICJobList_ExecJobs(t *testing.T) {
-	tmpDir := t.TempDir()
-	dc := &data_collector.DataCollector{
-		BaseDir:    tmpDir,
-		Logger:     log.New(io.Discard, "", 0),
-		Namespaces: []string{"test-ns"},
-	}
+	dc := mock.SetupMockDataCollector(t)
+	dc.Namespaces = []string{"test-ns"}
+
 	// Mock PodExecutor and QueryCRD
 	dc.PodExecutor = mockPodExecutor
 	dc.QueryCRD = mockQueryCRD
@@ -58,7 +53,7 @@ func TestNICJobList_ExecJobs(t *testing.T) {
 				t.Errorf("Job %s returned error: %v", job.Name, result.Error)
 			}
 			for file, content := range result.Files {
-				if !strings.HasPrefix(filepath.ToSlash(file), filepath.ToSlash(tmpDir)) {
+				if !strings.HasPrefix(filepath.ToSlash(file), filepath.ToSlash(dc.BaseDir)) {
 					t.Errorf("File path %s does not start with tmpDir", file)
 				}
 				if len(content) == 0 {
@@ -72,12 +67,8 @@ func TestNICJobList_ExecJobs(t *testing.T) {
 }
 
 func TestNICJobList_CRDObjects(t *testing.T) {
-	tmpDir := t.TempDir()
-	dc := &data_collector.DataCollector{
-		BaseDir:    tmpDir,
-		Logger:     log.New(io.Discard, "", 0),
-		Namespaces: []string{"test-ns"},
-	}
+	dc := mock.SetupMockDataCollector(t)
+	dc.Namespaces = []string{"test-ns"}
 	dc.QueryCRD = mockQueryCRD
 
 	jobList := NICJobList()
@@ -93,7 +84,7 @@ func TestNICJobList_CRDObjects(t *testing.T) {
 					t.Errorf("CRD job returned error: %v", result.Error)
 				}
 				for file, content := range result.Files {
-					if !strings.HasPrefix(filepath.ToSlash(file), filepath.ToSlash(tmpDir)) {
+					if !strings.HasPrefix(filepath.ToSlash(file), filepath.ToSlash(dc.BaseDir)) {
 						t.Errorf("File path %s does not start with tmpDir", file)
 					}
 					var out map[string]interface{}

@@ -3,24 +3,18 @@ package jobs
 import (
 	"context"
 	"errors"
-	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/mock"
 )
 
 // Test successful job execution and file writing
 func TestJobCollect_Success(t *testing.T) {
-	tmpDir := t.TempDir()
-	dc := &data_collector.DataCollector{
-		BaseDir: tmpDir,
-		Logger:  log.New(io.Discard, "", 0),
-	}
-
+	dc := mock.SetupMockDataCollector(t)
 	job := Job{
 		Name:    "test-job",
 		Timeout: time.Second,
@@ -40,7 +34,7 @@ func TestJobCollect_Success(t *testing.T) {
 		t.Fatalf("expected not skipped")
 	}
 	// Check file was written
-	content, err := os.ReadFile(filepath.Join(tmpDir, "output.txt"))
+	content, err := os.ReadFile(filepath.Join(dc.BaseDir, "output.txt"))
 	if err != nil {
 		t.Fatalf("file not written: %v", err)
 	}
@@ -51,10 +45,7 @@ func TestJobCollect_Success(t *testing.T) {
 
 // Test job skipped scenario
 func TestJobCollect_Skipped(t *testing.T) {
-	dc := &data_collector.DataCollector{
-		BaseDir: t.TempDir(),
-		Logger:  log.New(io.Discard, "", 0),
-	}
+	dc := mock.SetupMockDataCollector(t)
 	job := Job{
 		Name:    "skip-job",
 		Timeout: time.Second,
@@ -73,10 +64,7 @@ func TestJobCollect_Skipped(t *testing.T) {
 
 // Test job error scenario
 func TestJobCollect_Error(t *testing.T) {
-	dc := &data_collector.DataCollector{
-		BaseDir: t.TempDir(),
-		Logger:  log.New(io.Discard, "", 0),
-	}
+	dc := mock.SetupMockDataCollector(t)
 	job := Job{
 		Name:    "error-job",
 		Timeout: time.Second,
@@ -95,10 +83,7 @@ func TestJobCollect_Error(t *testing.T) {
 
 // Test job timeout scenario
 func TestJobCollect_Timeout(t *testing.T) {
-	dc := &data_collector.DataCollector{
-		BaseDir: t.TempDir(),
-		Logger:  log.New(io.Discard, "", 0),
-	}
+	dc := mock.SetupMockDataCollector(t)
 	job := Job{
 		Name:    "timeout-job",
 		Timeout: time.Millisecond * 10,

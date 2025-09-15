@@ -2,26 +2,25 @@ package jobs
 
 import (
 	"context"
-	"io"
-	"log"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestNGXJobList_ExecNginxT(t *testing.T) {
-	tmpDir := t.TempDir()
-	dc := &data_collector.DataCollector{
-		BaseDir:    tmpDir,
-		Logger:     log.New(io.Discard, "", 0),
-		Namespaces: []string{"default"},
-	}
+	// dc := &data_collector.DataCollector{
+	// 	BaseDir:    tmpDir,
+	// 	Logger:     log.New(io.Discard, "", 0),
+	// 	Namespaces: []string{"default"},
+	// }
+
+	dc := mock.SetupMockDataCollector(t)
 
 	// Create a fake pod named "nginx-123" in the "default" namespace
 	pod := &corev1.Pod{
@@ -62,8 +61,8 @@ func TestNGXJobList_ExecNginxT(t *testing.T) {
 			if string(content) != "nginx -T output" {
 				t.Errorf("unexpected file content: %s", string(content))
 			}
-			if !strings.HasPrefix(filepath.ToSlash(file), filepath.ToSlash(tmpDir)) {
-				t.Errorf("file path %s does not start with tmpDir %s", file, tmpDir)
+			if !strings.HasPrefix(filepath.ToSlash(file), filepath.ToSlash(dc.BaseDir)) {
+				t.Errorf("file path %s does not start with tmpDir %s", file, dc.BaseDir)
 			}
 			found = true
 		}

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -38,7 +38,6 @@ func TestNGFJobList(t *testing.T) {
 }
 
 func TestNGFJobExecNginxGatewayVersion(t *testing.T) {
-	tmpDir := t.TempDir()
 	client := fake.NewSimpleClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nginx-gateway-test-pod",
@@ -51,14 +50,10 @@ func TestNGFJobExecNginxGatewayVersion(t *testing.T) {
 		},
 	})
 
-	dc := &data_collector.DataCollector{
-		BaseDir:          tmpDir,
-		Namespaces:       []string{"default"},
-		K8sCoreClientSet: client,
-		Logger:           log.New(io.Discard, "", 0),
-		PodExecutor: func(namespace, pod, container string, command []string, ctx context.Context) ([]byte, error) {
-			return []byte("gateway version output"), nil
-		},
+	dc := mock.SetupMockDataCollector(t)
+	dc.K8sCoreClientSet = client
+	dc.PodExecutor = func(namespace, pod, container string, command []string, ctx context.Context) ([]byte, error) {
+		return []byte("gateway version output"), nil
 	}
 
 	jobs := NGFJobList()
@@ -97,7 +92,6 @@ func TestNGFJobExecNginxGatewayVersion(t *testing.T) {
 }
 
 func TestNGFJobExecNginxT(t *testing.T) {
-	tmpDir := t.TempDir()
 	client := fake.NewSimpleClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nginx-gateway-test-pod",
@@ -110,15 +104,13 @@ func TestNGFJobExecNginxT(t *testing.T) {
 		},
 	})
 
-	dc := &data_collector.DataCollector{
-		BaseDir:          tmpDir,
-		Namespaces:       []string{"default"},
-		K8sCoreClientSet: client,
-		Logger:           log.New(io.Discard, "", 0),
-		PodExecutor: func(namespace, pod, container string, command []string, ctx context.Context) ([]byte, error) {
-			return []byte("nginx -t output"), nil
-		},
+	dc := mock.SetupMockDataCollector(t)
+	dc.Namespaces = []string{"default"}
+	dc.K8sCoreClientSet = client
+	dc.PodExecutor = func(namespace, pod, container string, command []string, ctx context.Context) ([]byte, error) {
+		return []byte("nginx -t output"), nil
 	}
+	dc.Logger = log.New(io.Discard, "", 0)
 
 	jobs := NGFJobList()
 	var tJob Job

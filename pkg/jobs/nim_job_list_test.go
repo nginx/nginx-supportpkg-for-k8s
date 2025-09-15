@@ -2,14 +2,12 @@ package jobs
 
 import (
 	"context"
-	"io"
-	"log"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,12 +15,13 @@ import (
 )
 
 func TestNIMJobList_ExecJobs(t *testing.T) {
-	tmpDir := t.TempDir()
-	dc := &data_collector.DataCollector{
-		BaseDir:    tmpDir,
-		Logger:     log.New(io.Discard, "", 0),
-		Namespaces: []string{"default"},
-	}
+	// dc := &data_collector.DataCollector{
+	// 	BaseDir:    tmpDir,
+	// 	Logger:     log.New(io.Discard, "", 0),
+	// 	Namespaces: []string{"default"},
+	// }
+	dc := mock.SetupMockDataCollector(t)
+	dc.Namespaces = []string{"default"}
 
 	// Create fake pods for each job type
 	pods := []*corev1.Pod{
@@ -94,8 +93,8 @@ func TestNIMJobList_ExecJobs(t *testing.T) {
 				t.Errorf("Job %s returned error: %v", job.Name, result.Error)
 			}
 			for file, content := range result.Files {
-				if !strings.HasPrefix(filepath.ToSlash(file), filepath.ToSlash(tmpDir)) {
-					t.Errorf("File path %s does not start with tmpDir %s", file, tmpDir)
+				if !strings.HasPrefix(filepath.ToSlash(file), filepath.ToSlash(dc.BaseDir)) {
+					t.Errorf("File path %s does not start with tmpDir %s", file, dc.BaseDir)
 				}
 				if len(content) == 0 {
 					t.Errorf("File %s has empty content", file)
@@ -108,25 +107,20 @@ func TestNIMJobList_ExecJobs(t *testing.T) {
 }
 
 func TestNIMJobList_ExcludeFlags(t *testing.T) {
-	tmpDir := t.TempDir()
-	dc := &data_collector.DataCollector{
-		BaseDir:    tmpDir,
-		Logger:     log.New(io.Discard, "", 0),
-		Namespaces: []string{"default"},
-		K8sCoreClientSet: fake.NewSimpleClientset(&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "clickhouse-456",
-				Namespace: "default",
-			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "clickhouse-server"}},
-			},
-		}),
-		PodExecutor: func(namespace, pod, container string, command []string, ctx context.Context) ([]byte, error) {
-			return []byte("output"), nil
+	dc := mock.SetupMockDataCollector(t)
+	dc.Namespaces = []string{"default"}
+	dc.K8sCoreClientSet = fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "clickhouse-456",
+			Namespace: "default",
 		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: "clickhouse-server"}},
+		},
+	})
+	dc.PodExecutor = func(namespace, pod, container string, command []string, ctx context.Context) ([]byte, error) {
+		return []byte("output"), nil
 	}
-
 	// Test ExcludeTimeSeriesData for exec-clickhouse-data
 	dc.ExcludeTimeSeriesData = true
 	for _, job := range NIMJobList() {
