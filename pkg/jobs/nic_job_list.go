@@ -23,12 +23,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
-	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func NICJobList() []Job {
@@ -47,14 +48,15 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-
-									res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
-									if err != nil {
-										jobResult.Error = err
-										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
-									} else {
-										fileName := fmt.Sprintf("%s__%s__nginx-ingress-version.txt", pod.Name, container.Name)
-										jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+									if container.Name == "nginx-ingress" {
+										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
+										if err != nil {
+											jobResult.Error = err
+											dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
+										} else {
+											fileName := fmt.Sprintf("%s__%s__nginx-ingress-version.txt", pod.Name, container.Name)
+											jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+										}
 									}
 								}
 							}
@@ -78,13 +80,15 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
-									if err != nil {
-										jobResult.Error = err
-										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
-									} else {
-										fileName := fmt.Sprintf("%s__%s__nginx-t.txt", pod.Name, container.Name)
-										jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+									if container.Name == "nginx-ingress" {
+										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
+										if err != nil {
+											jobResult.Error = err
+											dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
+										} else {
+											fileName := fmt.Sprintf("%s__%s__nginx-t.txt", pod.Name, container.Name)
+											jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+										}
 									}
 								}
 							}
@@ -108,13 +112,15 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
-									if err != nil {
-										jobResult.Error = err
-										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
-									} else {
-										fileName := fmt.Sprintf("%s__%s__nginx-agent.conf", pod.Name, container.Name)
-										jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+									if container.Name == "nginx-ingress" {
+										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
+										if err != nil {
+											jobResult.Error = err
+											dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
+										} else {
+											fileName := fmt.Sprintf("%s__%s__nginx-agent.conf", pod.Name, container.Name)
+											jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+										}
 									}
 								}
 							}
@@ -138,13 +144,15 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
-									if err != nil {
-										jobResult.Error = err
-										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
-									} else {
-										fileName := fmt.Sprintf("%s__%s__nginx-agent-version.txt", pod.Name, container.Name)
-										jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+									if container.Name == "nginx-ingress" {
+										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
+										if err != nil {
+											jobResult.Error = err
+											dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
+										} else {
+											fileName := fmt.Sprintf("%s__%s__nginx-agent-version.txt", pod.Name, container.Name)
+											jobResult.Files[filepath.Join(dc.BaseDir, "exec", namespace, fileName)] = res
+										}
 									}
 								}
 							}
