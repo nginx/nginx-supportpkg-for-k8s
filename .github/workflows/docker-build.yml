@@ -60,7 +60,7 @@ jobs:
           path: vuln-report.json
 
       - name: Update Release Notes with Docker Image Info
-        uses: softprops/action-gh-release@v2.3.2
+        uses: softprops/action-gh-release@v2.4.0
         with:
           tag_name: ${{ github.event.release.tag_name }}
           body: |
