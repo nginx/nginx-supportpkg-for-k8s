@@ -332,30 +332,29 @@ func (c *DataCollector) GenerateManifest(product string, startTime time.Time, jo
 	// Read and parse product_info.json
 	filename := filepath.Join(c.BaseDir, "product_info.json")
 	file, err := os.Open(filename)
-	if err != nil {
-		log.Fatalf("failed to open file: %v", err)
-	}
-	defer file.Close()
-
 	var info ProductInfo
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&info); err != nil {
-		log.Fatalf("failed to decode JSON: %v", err)
+	if err != nil {
+		c.Logger.Printf("Warning: failed to open product_info.json: %v. Using default values.", err)
+	} else {
+		defer file.Close()
+		decoder := json.NewDecoder(file)
+		if err := decoder.Decode(&info); err != nil {
+			c.Logger.Printf("Warning: failed to decode product_info.json: %v. Using default values.", err)
+		}
 	}
 
 	filename = filepath.Join(c.BaseDir, "platform_info.json")
 	file, err = os.Open(filename)
-	if err != nil {
-		log.Fatalf("failed to open file: %v", err)
-	}
-	defer file.Close()
-
 	var platformInfo PlatformInfo
-	decoder = json.NewDecoder(file)
-	if err = decoder.Decode(&platformInfo); err != nil {
-		log.Fatalf("failed to decode JSON: %v", err)
+	if err != nil {
+		c.Logger.Printf("Warning: failed to open platform_info.json: %v. Using default values.", err)
+	} else {
+		defer file.Close()
+		decoder = json.NewDecoder(file)
+		if err = decoder.Decode(&platformInfo); err != nil {
+			c.Logger.Printf("Warning: failed to decode platform_info.json: %v. Using default values.", err)
+		}
 	}
-
 	manifest := Manifest{
 		Version: "1.2", // Match the schema version
 		Timestamp: TimestampInfo{
