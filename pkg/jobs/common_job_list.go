@@ -436,7 +436,9 @@ func CommonJobList() []Job {
 					var nodeList corev1.NodeList
 					err := json.Unmarshal(jsonResult, &nodeList)
 					if err != nil {
-						// handle error
+						dc.Logger.Printf("\tCould not unmarshal nodes information: %v\n", err)
+						ch <- jobResult
+						return
 					}
 
 					var hostnames []string
