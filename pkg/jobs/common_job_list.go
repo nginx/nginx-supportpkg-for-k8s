@@ -468,7 +468,6 @@ func CommonJobList() []Job {
 						dc.Logger.Printf("\tCould not marshal platformInfo: %v\n", err)
 					} else {
 						jobResult.Files[filepath.Join(dc.BaseDir, platformInfoFilename)] = platformInfoBytes
-						dc.Logger.Printf("\tPlatform Info: %s\n", platformInfoBytes)
 					}
 				}
 				ch <- jobResult
