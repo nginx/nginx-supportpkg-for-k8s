@@ -459,9 +459,13 @@ func CommonJobList() []Job {
 					if err == nil && versionInfo != nil {
 						k8sVersion = versionInfo.GitVersion
 					}
+					hostname := "N/A"
+					if len(hostnames) > 0 {
+						hostname = hostnames[0]
+					}
 					platformInfo := data_collector.PlatformInfo{
 						PlatformType: fmt.Sprintf("%s, k8s version: %s", platformType, k8sVersion),
-						Hostname:     hostnames[0],
+						Hostname:     hostname,
 						SerialNumber: "N/A",
 					}
 
