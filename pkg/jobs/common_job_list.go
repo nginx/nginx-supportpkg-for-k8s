@@ -440,7 +440,7 @@ func CommonJobList() []Job {
 					for _, node := range nodeList.Items {
 						labels := node.ObjectMeta.Labels
 						// If the node does NOT have the control-plane label, include its name
-						if labels["node-role.kubernetes.io/control-plane"] == "" {
+						if _, exists := labels["node-role.kubernetes.io/control-plane"]; exists {
 							hostname = node.ObjectMeta.Name
 							osImage := node.Status.NodeInfo.OSImage
 							osType := node.Status.NodeInfo.OperatingSystem
