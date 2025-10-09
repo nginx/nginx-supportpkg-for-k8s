@@ -34,7 +34,6 @@ import (
 
 	helmClient "github.com/mittwald/go-helm-client"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
-	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/version"
 	corev1 "k8s.io/api/core/v1"
 	crdClient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,12 +93,14 @@ type CommandTiming struct {
 type ProductInfo struct {
 	Product string `json:"product"`
 	Version string `json:"version"`
+	Build   string `json:"build"`
 }
 
 type PlatformInfo struct {
 	// Add platform-specific fields as needed
-	K8sVersion string   `json:"k8s_version,omitempty"`
-	Namespaces []string `json:"namespaces,omitempty"`
+	PlatformType string `json:"platform_type,omitempty"`
+	Hostname     string `json:"hostname,omitempty"`
+	SerialNumber string `json:"serial_number,omitempty"`
 }
 
 type SubPackage struct {
@@ -328,22 +329,44 @@ func (c *DataCollector) AllNamespacesExist() bool {
 }
 
 func (c *DataCollector) GenerateManifest(product string, startTime time.Time, jobsRun, jobsFailed int, jobTimings []JobInfo) ([]byte, error) {
+	// Read and parse product_info.json
+	filename := filepath.Join(c.BaseDir, "product_info.json")
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatalf("failed to open file: %v", err)
+	}
+	defer file.Close()
+
+	var info ProductInfo
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&info); err != nil {
+		log.Fatalf("failed to decode JSON: %v", err)
+	}
+
+	filename = filepath.Join(c.BaseDir, "platform_info.json")
+	file, err = os.Open(filename)
+	if err != nil {
+		log.Fatalf("failed to open file: %v", err)
+	}
+	defer file.Close()
+
+	var platformInfo PlatformInfo
+	decoder = json.NewDecoder(file)
+	if err = decoder.Decode(&platformInfo); err != nil {
+		log.Fatalf("failed to decode JSON: %v", err)
+	}
+
 	manifest := Manifest{
 		Version: "1.2", // Match the schema version
 		Timestamp: TimestampInfo{
 			Start: startTime.UTC().Format(time.RFC3339Nano),
 			Stop:  time.Now().UTC().Format(time.RFC3339Nano),
 		},
-		PackageType: "root", // As defined in schema enum
-		RootDir:     ".",
-		ProductInfo: ProductInfo{
-			Product: product,
-			Version: version.Version,
-		},
-		PlatformInfo: PlatformInfo{
-			Namespaces: c.Namespaces,
-		},
-		Commands: []Command{},
+		PackageType:  "root", // As defined in schema enum
+		RootDir:      ".",
+		ProductInfo:  info,
+		PlatformInfo: platformInfo,
+		Commands:     []Command{},
 	}
 
 	// Convert job timings to commands format
