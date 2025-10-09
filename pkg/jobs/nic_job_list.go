@@ -223,9 +223,9 @@ func NICJobList() []Job {
 										jobResult.Error = err
 										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
 									} else {
-										product_info := ParseNginxIngressProductInfo(res)
+										productInfo := ParseNginxIngressProductInfo(res)
 										fileName := "product_info.json"
-										jsonBytes, err := json.MarshalIndent(product_info, "", "  ")
+										jsonBytes, err := json.MarshalIndent(productInfo, "", "  ")
 										if err != nil {
 											jobResult.Error = err
 										} else {
