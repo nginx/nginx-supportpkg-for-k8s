@@ -218,20 +218,22 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
-									if err != nil {
-										jobResult.Error = err
-										dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
-									} else {
-										productInfo := ParseNginxIngressProductInfo(res)
-										fileName := "product_info.json"
-										jsonBytes, err := json.MarshalIndent(productInfo, "", "  ")
+									if container.Name == "nginx-ingress" {
+										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
 										if err != nil {
 											jobResult.Error = err
+											dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
 										} else {
-											jobResult.Files[filepath.Join(dc.BaseDir, fileName)] = jsonBytes
+											productInfo := ParseNginxIngressProductInfo(res)
+											fileName := "product_info.json"
+											jsonBytes, err := json.MarshalIndent(productInfo, "", "  ")
+											if err != nil {
+												jobResult.Error = err
+											} else {
+												jobResult.Files[filepath.Join(dc.BaseDir, fileName)] = jsonBytes
+											}
+											ch <- jobResult
 										}
-										ch <- jobResult
 									}
 								}
 							}
