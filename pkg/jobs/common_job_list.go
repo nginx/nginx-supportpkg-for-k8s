@@ -435,18 +435,19 @@ func CommonJobList() []Job {
 					jobResult.Files[filepath.Join(dc.BaseDir, "k8s", "nodes.json")] = jsonResult
 					nodeList := result
 
-					var hostnames []string
+					var hostname string
 					var platformType string
 					for _, node := range nodeList.Items {
 						labels := node.ObjectMeta.Labels
 						// If the node does NOT have the control-plane label, include its name
 						if labels["node-role.kubernetes.io/control-plane"] == "" {
-							hostnames = append(hostnames, node.ObjectMeta.Name)
+							hostname = node.ObjectMeta.Name
 							osImage := node.Status.NodeInfo.OSImage
 							osType := node.Status.NodeInfo.OperatingSystem
 							osArch := node.Status.NodeInfo.Architecture
 
 							platformType = fmt.Sprintf("%s %s/%s", osImage, osType, osArch)
+							break
 						}
 					}
 					const platformInfoFilename = "platform_info.json"
@@ -455,10 +456,7 @@ func CommonJobList() []Job {
 					if err == nil && versionInfo != nil {
 						k8sVersion = versionInfo.GitVersion
 					}
-					hostname := "N/A"
-					if len(hostnames) > 0 {
-						hostname = hostnames[0]
-					}
+
 					platformInfo := data_collector.PlatformInfo{
 						PlatformType: fmt.Sprintf("%s, k8s version: %s", platformType, k8sVersion),
 						Hostname:     hostname,
