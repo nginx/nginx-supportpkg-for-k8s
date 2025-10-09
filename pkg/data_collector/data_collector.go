@@ -350,7 +350,7 @@ func (c *DataCollector) GenerateManifest(product string, startTime time.Time, jo
 		c.Logger.Printf("Warning: failed to open platform_info.json: %v. Using default values.", err)
 	} else {
 		defer file.Close()
-		decoder = json.NewDecoder(file)
+		decoder := json.NewDecoder(file)
 		if err = decoder.Decode(&platformInfo); err != nil {
 			c.Logger.Printf("Warning: failed to decode platform_info.json: %v. Using default values.", err)
 		}
