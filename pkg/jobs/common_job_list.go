@@ -433,13 +433,7 @@ func CommonJobList() []Job {
 				} else {
 					jsonResult, _ := json.MarshalIndent(result, "", "  ")
 					jobResult.Files[filepath.Join(dc.BaseDir, "k8s", "nodes.json")] = jsonResult
-					var nodeList corev1.NodeList
-					err := json.Unmarshal(jsonResult, &nodeList)
-					if err != nil {
-						dc.Logger.Printf("\tCould not unmarshal nodes information: %v\n", err)
-						ch <- jobResult
-						return
-					}
+					nodeList := result
 
 					var hostnames []string
 					var platformType string
