@@ -433,6 +433,42 @@ func CommonJobList() []Job {
 				} else {
 					jsonResult, _ := json.MarshalIndent(result, "", "  ")
 					jobResult.Files[filepath.Join(dc.BaseDir, "k8s", "nodes.json")] = jsonResult
+					nodeList := result
+
+					var hostname string
+					var platformType string
+					for _, node := range nodeList.Items {
+						labels := node.ObjectMeta.Labels
+						// If the node does NOT have the control-plane label, include its name
+						if _, exists := labels["node-role.kubernetes.io/control-plane"]; exists {
+							hostname = node.ObjectMeta.Name
+							osImage := node.Status.NodeInfo.OSImage
+							osType := node.Status.NodeInfo.OperatingSystem
+							osArch := node.Status.NodeInfo.Architecture
+
+							platformType = fmt.Sprintf("%s %s/%s", osImage, osType, osArch)
+							break
+						}
+					}
+					const platformInfoFilename = "platform_info.json"
+					versionInfo, err := dc.K8sCoreClientSet.Discovery().ServerVersion()
+					k8sVersion := ""
+					if err == nil && versionInfo != nil {
+						k8sVersion = versionInfo.GitVersion
+					}
+
+					platformInfo := data_collector.PlatformInfo{
+						PlatformType: fmt.Sprintf("%s, k8s version: %s", platformType, k8sVersion),
+						Hostname:     hostname,
+						SerialNumber: "N/A",
+					}
+
+					platformInfoBytes, err := json.MarshalIndent(platformInfo, "", "  ")
+					if err != nil {
+						dc.Logger.Printf("\tCould not marshal platformInfo: %v\n", err)
+					} else {
+						jobResult.Files[filepath.Join(dc.BaseDir, platformInfoFilename)] = platformInfoBytes
+					}
 				}
 				ch <- jobResult
 			},

@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,6 +32,27 @@ import (
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// Extracts ProductInfo from nginx-ingress --version output
+func ParseNginxIngressProductInfo(res []byte) data_collector.ProductInfo {
+	productInfo := data_collector.ProductInfo{
+		Version: "unknown",
+		Product: "NGINX Ingress Controller",
+		Build:   "unknown",
+	}
+
+	re := regexp.MustCompile(`Version=([^\s]+)`)
+	matches := re.FindSubmatch(res)
+	if len(matches) > 1 {
+		productInfo.Version = string(matches[1])
+	}
+	re = regexp.MustCompile(`Commit=([^\s]+)`)
+	matches = re.FindSubmatch(res)
+	if len(matches) > 1 {
+		productInfo.Build = string(matches[1])
+	}
+	return productInfo
+}
 
 func NICJobList() []Job {
 	jobList := []Job{
@@ -180,6 +202,44 @@ func NICJobList() []Job {
 					}
 				}
 				ch <- jobResult
+			},
+		},
+		{
+			Name:    "collect-product-platform-info",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+				command := []string{"./nginx-ingress", "--version"}
+				for _, namespace := range dc.Namespaces {
+					pods, err := dc.K8sCoreClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						dc.Logger.Printf("\tCould not retrieve pod list for namespace %s: %v\n", namespace, err)
+					} else {
+						for _, pod := range pods.Items {
+							if strings.Contains(pod.Name, "ingress") {
+								for _, container := range pod.Spec.Containers {
+									if container.Name == "nginx-ingress" {
+										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
+										if err != nil {
+											jobResult.Error = err
+											dc.Logger.Printf("\tCommand execution %s failed for pod %s in namespace %s: %v\n", command, pod.Name, namespace, err)
+										} else {
+											productInfo := ParseNginxIngressProductInfo(res)
+											fileName := "product_info.json"
+											jsonBytes, err := json.MarshalIndent(productInfo, "", "  ")
+											if err != nil {
+												jobResult.Error = err
+											} else {
+												jobResult.Files[filepath.Join(dc.BaseDir, fileName)] = jsonBytes
+											}
+											ch <- jobResult
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 			},
 		},
 	}
