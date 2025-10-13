@@ -21,10 +21,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
+	"k8s.io/utils/ptr"
 )
-
-// helper creates int32 ptr
-func i32(v int32) *int32 { return &v }
 
 func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 	t.Helper()
@@ -46,7 +44,7 @@ func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{Name: "dep-1", Namespace: "default"},
 			Spec: appsv1.DeploymentSpec{
-				Replicas: i32(1),
+				Replicas: ptr.To(int32(1)),
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "demo"}},
