@@ -38,7 +38,7 @@ func TestNICJobList_ExecJobs(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "ingress-pod", Namespace: "test-ns"},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
-				{Name: "container1"},
+				{Name: "nginx-ingress", Image: "nginx-ingress:latest"},
 			},
 		},
 	})
