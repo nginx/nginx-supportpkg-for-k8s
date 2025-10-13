@@ -10,6 +10,10 @@ set -euo pipefail
 #  6 - manifest.json is not valid JSON
 #  7 - missing required JSON keys
 
+usage() {
+  echo "Usage: $0 <directory-containing-manifest.json>" >&2
+  exit 2
+}
 if [[ ${#} -ne 1 ]]; then
   usage
 fi
