@@ -61,23 +61,8 @@ required=(
 
 missing=()
 for p in "${required[@]}"; do
-  # split dot-separated path into array elements and build a jq array literal
-  IFS='.' read -r -a parts <<< "$p"
-  # build JSON array like ["a","b"]
-  jq_array="["
-  first=1
-  for part in "${parts[@]}"; do
-    if [[ $first -eq 1 ]]; then
-      jq_array+="\"${part}\""
-      first=0
-    else
-      jq_array+=",\"${part}\""
-    fi
-  done
-  jq_array+="]"
-
-  # Test presence: use getpath(array) and check that it exists and is not null
-  if ! jq -e "getpath($jq_array) != null" "$manifest" >/dev/null 2>&1; then
+  # Test presence: use getpath(split(".")) and check that it exists and is not null
+  if ! jq -e --arg p "$p" 'getpath($p | split(".")) != null' "$manifest" >/dev/null 2>&1; then
     missing+=("$p")
   fi
 done
