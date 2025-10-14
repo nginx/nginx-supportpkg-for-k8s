@@ -103,7 +103,11 @@ func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 		t.Fail()
 	}
 	helmClient.EXPECT().GetSettings().Return(&cli.EnvSettings{}).AnyTimes()
-	var mockedRelease = release.Release{Name: "test", Namespace: "test", Manifest: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: example-config\n  namespace: default\ndata:\n  key: value\n"}
+	var mockedRelease = release.Release{
+		Name:      "test",
+		Namespace: "test",
+		Manifest:  "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: example-config\n  namespace: default\ndata:\n  key: value\n",
+	}
 	helmClient.EXPECT().ListDeployedReleases().Return([]*release.Release{&mockedRelease}, nil).AnyTimes()
 
 	return &data_collector.DataCollector{

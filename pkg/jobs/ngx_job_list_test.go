@@ -14,12 +14,6 @@ import (
 )
 
 func TestNGXJobList_ExecNginxT(t *testing.T) {
-	// dc := &data_collector.DataCollector{
-	// 	BaseDir:    tmpDir,
-	// 	Logger:     log.New(io.Discard, "", 0),
-	// 	Namespaces: []string{"default"},
-	// }
-
 	dc := mock.SetupMockDataCollector(t)
 
 	// Create a fake pod named "nginx-123" in the "default" namespace

@@ -15,11 +15,6 @@ import (
 )
 
 func TestNIMJobList_ExecJobs(t *testing.T) {
-	// dc := &data_collector.DataCollector{
-	// 	BaseDir:    tmpDir,
-	// 	Logger:     log.New(io.Discard, "", 0),
-	// 	Namespaces: []string{"default"},
-	// }
 	dc := mock.SetupMockDataCollector(t)
 	dc.Namespaces = []string{"default"}
 
