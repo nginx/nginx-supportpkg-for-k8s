@@ -3,17 +3,14 @@ set -euo pipefail
 
 # Exit codes:
 #  0 - success
-#  2 - usage / bad args
 #  3 - missing dependency (jq)
 #  4 - manifest.json not found
 #  5 - manifest.json exists but is not a regular file
 #  6 - manifest.json is not valid JSON
 #  7 - missing required JSON keys
+#  8 - missing files in the supportpkg
+#  9 - missing files in the manifest
 
-usage() {
-  echo "Usage: $0 <directory-containing-manifest.json>" >&2
-  exit 2
-}
 if [[ ${#} -ne 1 ]]; then
   usage
 fi
@@ -75,5 +72,23 @@ if [[ ${#missing[@]} -ne 0 ]]; then
   exit 7
 fi
 
-echo "OK: $manifest is valid and contains all required keys"
+# Check that there is a 1:1 correspondence between manifest and tarball content
+
+find "${dir}" -type f -mindepth 1 | cut -c "$(( ${#dir} + 1 ))"- > find-output.txt
+jq -r '.commands[].output' "${dir}"/manifest.json > manifest-output.txt
+printf "/manifest.json\n/supportpkg.log" >> manifest-output.txt
+if grep -vxFf find-output.txt manifest-output.txt >/dev/null; then
+  echo "ERROR: Manifest contains files not present in the supportpkg:"
+  grep -vxFf find-output.txt manifest-output.txt
+  exit 8
+fi
+if grep -vxFf manifest-output.txt find-output.txt >/dev/null; then
+  echo "ERROR: Supportpkg contains files not present in the manifest:"
+  grep -vxFf manifest-output.txt find-output.txt
+  exit 9
+fi
+
+# All good if we reached this point
+
+echo "OK: $manifest is valid and consistent with the supportpkg contents"
 exit 0
