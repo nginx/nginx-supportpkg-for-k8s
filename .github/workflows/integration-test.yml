@@ -106,6 +106,10 @@ jobs:
         # Verify expected files exist
         bash .github/scripts/verify-contents.sh extracted_test
 
+    - name: Validate manifest file
+      run: |
+        bash .github/scripts/verify-manifest.sh extracted_test
+
     - name: Upload test artifacts
       if: always()
       uses: actions/upload-artifact@v4
