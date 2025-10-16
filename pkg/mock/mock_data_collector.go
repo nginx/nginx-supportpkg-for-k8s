@@ -99,9 +99,9 @@ func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	helmClient := mockHelmClient.NewMockClient(ctrl)
-	if helmClient == nil {
-		t.Fail()
-	}
+
+
+
 	helmClient.EXPECT().GetSettings().Return(&cli.EnvSettings{}).AnyTimes()
 	var mockedRelease = release.Release{
 		Name:      "test",
