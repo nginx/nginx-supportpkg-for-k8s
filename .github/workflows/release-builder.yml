@@ -12,7 +12,7 @@ env:
 
 jobs:
   build:
-    if: endsWith(github.event.release.tag_name, '-krew')
+    if: "!endsWith(github.event.release.tag_name, '-docker')"
     permissions:
       contents: write
 
@@ -20,13 +20,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493 # v4.2.2
 
       - name: Set Release Version
         run: echo "RELEASE_VERSION=${RELEASE_VERSION%-krew}" >> $GITHUB_ENV
 
       - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@19bb51245e9c80abacb2e91cc42b33fa478b8639 # v4.2.1
         with:
           go-version: '1.24.3'
 

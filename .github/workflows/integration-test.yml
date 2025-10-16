@@ -12,10 +12,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
         go-version: '1.24'
 
@@ -105,6 +105,10 @@ jobs:
         
         # Verify expected files exist
         bash .github/scripts/verify-contents.sh extracted_test
+
+    - name: Validate manifest file
+      run: |
+        bash .github/scripts/verify-manifest.sh extracted_test
 
     - name: Upload test artifacts
       if: always()
