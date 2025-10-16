@@ -93,7 +93,7 @@ func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 		},
 	}
 
-	crdClient := apiextensionsfake.NewSimpleClientset(crd)
+	crdClient := apiextensionsfake.NewClientset(crd)
 	metricsClient := metricsfake.NewSimpleClientset()
 
 	ctrl := gomock.NewController(t)
