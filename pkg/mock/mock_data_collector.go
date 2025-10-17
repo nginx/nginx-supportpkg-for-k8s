@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"bytes"
 	"embed"
 	"io"
 	"log"
@@ -12,64 +13,63 @@ import (
 	"go.uber.org/mock/gomock"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/release"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsfake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
 //go:embed testdata/crds.yaml
+//go:embed testdata/objects.yaml
 var testDataFS embed.FS
+
+func loadObjectsFromYAML(filename string) ([]runtime.Object, error) {
+	data, err := testDataFS.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	var objects []runtime.Object
+
+	// Split YAML documents by "---"
+	docs := bytes.Split(data, []byte("---"))
+
+	for _, doc := range docs {
+		doc = bytes.TrimSpace(doc)
+		if len(doc) == 0 {
+			continue
+		}
+
+		// Use the universal deserializer directly
+		obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(doc, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		if obj != nil {
+			objects = append(objects, obj)
+		}
+	}
+	return objects, nil
+}
 
 func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 	t.Helper()
 
 	tmpDir := t.TempDir()
 
-	// Seed fake objects (namespace default implied by metadata)
-	objs := []runtime.Object{
-		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default"},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "c1", Image: "nginx:latest"}},
-			},
-		},
-		&corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{Name: "svc-1", Namespace: "default"},
-			Spec:       corev1.ServiceSpec{Selector: map[string]string{"app": "demo"}},
-		},
-		&appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{Name: "dep-1", Namespace: "default"},
-			Spec: appsv1.DeploymentSpec{
-				Replicas: ptr.To(int32(1)),
-				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "demo"}},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{{Name: "dep-c1", Image: "nginx:latest"}},
-					},
-				},
-			},
-		},
-		&rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{Name: "role-1", Namespace: "default"},
-			Rules:      []rbacv1.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}}},
-		},
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: "cm-1", Namespace: "default"},
-			Data:       map[string]string{"k": "v"},
-		},
+	// Load objects from YAML instead of hardcoding
+	objs, err := loadObjectsFromYAML("testdata/objects.yaml")
+	if err != nil {
+		t.Fatalf("Failed to load test objects: %v", err)
 	}
 
 	client := fake.NewSimpleClientset(objs...)
+
 	// Mock rest.Config
 	restConfig := &rest.Config{
 		Host: "https://mock-k8s-server",
