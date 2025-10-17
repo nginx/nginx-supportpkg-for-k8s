@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"embed"
 	"io"
 	"log"
 	"testing"
@@ -22,7 +23,11 @@ import (
 	"k8s.io/client-go/rest"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 )
+
+//go:embed testdata/crds.yaml
+var testDataFS embed.FS
 
 func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 	t.Helper()
@@ -70,27 +75,15 @@ func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 		Host: "https://mock-k8s-server",
 	}
 
-	// Create a CRD clientset (using the real clientset, but not actually connecting)
-	crd := &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "testcrd.example.com",
-		},
-		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: "example.com",
-			Names: apiextensionsv1.CustomResourceDefinitionNames{
-				Kind:     "TestCRD",
-				Plural:   "testcrds",
-				Singular: "testcrd",
-			},
-			Scope: apiextensionsv1.NamespaceScoped,
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
-				{
-					Name:    "v1",
-					Served:  true,
-					Storage: true,
-				},
-			},
-		},
+	// Use embedded file
+	data, err := testDataFS.ReadFile("testdata/crds.yaml")
+	if err != nil {
+		t.Fatalf("failed to read embedded testdata/crds.yaml: %v", err)
+	}
+
+	crd := &apiextensionsv1.CustomResourceDefinition{}
+	if err := yaml.Unmarshal(data, crd); err != nil {
+		t.Fatalf("failed to unmarshal CRD from testdata/crds.yaml: %v", err)
 	}
 
 	crdClient := apiextensionsfake.NewClientset(crd)
@@ -99,8 +92,6 @@ func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	helmClient := mockHelmClient.NewMockClient(ctrl)
-
-
 
 	helmClient.EXPECT().GetSettings().Return(&cli.EnvSettings{}).AnyTimes()
 	var mockedRelease = release.Release{
