@@ -68,7 +68,7 @@ func SetupMockDataCollector(t *testing.T) *data_collector.DataCollector {
 		t.Fatalf("Failed to load test objects: %v", err)
 	}
 
-	client := fake.NewSimpleClientset(objs...)
+	client := fake.NewClientset(objs...)
 
 	// Mock rest.Config
 	restConfig := &rest.Config{
