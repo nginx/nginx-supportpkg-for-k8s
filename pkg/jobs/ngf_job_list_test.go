@@ -1,16 +1,22 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"strings"
 	"testing"
 
+	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/mock"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func TestNGFJobList(t *testing.T) {
@@ -38,7 +44,7 @@ func TestNGFJobList(t *testing.T) {
 }
 
 func TestNGFJobExecNginxGatewayVersion(t *testing.T) {
-	client := fake.NewSimpleClientset(&corev1.Pod{
+	client := fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nginx-gateway-test-pod",
 			Namespace: "default",
@@ -92,7 +98,7 @@ func TestNGFJobExecNginxGatewayVersion(t *testing.T) {
 }
 
 func TestNGFJobExecNginxT(t *testing.T) {
-	client := fake.NewSimpleClientset(&corev1.Pod{
+	client := fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nginx-gateway-test-pod",
 			Namespace: "default",
@@ -145,4 +151,204 @@ func TestNGFJobExecNginxT(t *testing.T) {
 	if !found {
 		t.Error("expected nginx-t.txt file to be created")
 	}
+}
+
+func TestNGFJobList_ExecNginxGatewayVersion_PodListError(t *testing.T) {
+	tmpDir := t.TempDir()
+	var logOutput bytes.Buffer
+
+	// Create a fake client that will return an error for pod listing
+	client := fake.NewClientset()
+	client.PrependReactor("list", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, fmt.Errorf("failed to retrieve pod list")
+	})
+
+	dc := &data_collector.DataCollector{
+		BaseDir:          tmpDir,
+		Namespaces:       []string{"default", "nginx-gateway"},
+		Logger:           log.New(&logOutput, "", 0),
+		K8sCoreClientSet: client,
+		PodExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+			return []byte("mock output"), nil
+		},
+	}
+
+	// Get the exec-nginx-gateway-version job
+	jobs := NGFJobList()
+	var execJob Job
+	for _, job := range jobs {
+		if job.Name == "exec-nginx-gateway-version" {
+			execJob = job
+			break
+		}
+	}
+
+	// Execute the job
+	ctx := context.Background()
+	ch := make(chan JobResult, 1)
+	execJob.Execute(dc, ctx, ch)
+
+	result := <-ch
+	logContent := logOutput.String()
+
+	// Verify the error was logged for each namespace
+	assert.Contains(t, logContent, "Could not retrieve pod list for namespace default: failed to retrieve pod list")
+	assert.Contains(t, logContent, "Could not retrieve pod list for namespace nginx-gateway: failed to retrieve pod list")
+
+	// Verify no files were created since pod listing failed
+	assert.Empty(t, result.Files, "No files should be created when pod list fails")
+	assert.Nil(t, result.Error, "Job should not fail, just log the error")
+}
+
+func TestNGFJobList_ExecNginxT_PodListError(t *testing.T) {
+	tmpDir := t.TempDir()
+	var logOutput bytes.Buffer
+
+	// Create a fake client that will return an error for pod listing
+	client := fake.NewClientset()
+	client.PrependReactor("list", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, fmt.Errorf("pod list API error")
+	})
+
+	dc := &data_collector.DataCollector{
+		BaseDir:          tmpDir,
+		Namespaces:       []string{"test-namespace"},
+		Logger:           log.New(&logOutput, "", 0),
+		K8sCoreClientSet: client,
+		PodExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+			return []byte("mock nginx config"), nil
+		},
+	}
+
+	// Get the exec-nginx-t job
+	jobs := NGFJobList()
+	var execJob Job
+	for _, job := range jobs {
+		if job.Name == "exec-nginx-t" {
+			execJob = job
+			break
+		}
+	}
+
+	// Execute the job
+	ctx := context.Background()
+	ch := make(chan JobResult, 1)
+	execJob.Execute(dc, ctx, ch)
+
+	result := <-ch
+	logContent := logOutput.String()
+
+	// Verify the error was logged
+	assert.Contains(t, logContent, "Could not retrieve pod list for namespace test-namespace: pod list API error")
+	assert.Empty(t, result.Files, "No files should be created when pod list fails")
+	assert.Nil(t, result.Error, "Job should not fail, just log the error")
+}
+
+func TestNGFJobList_MultipleNamespaces_PodListErrors(t *testing.T) {
+	tmpDir := t.TempDir()
+	var logOutput bytes.Buffer
+
+	// Create a fake client that returns different errors for different namespaces
+	client := fake.NewClientset()
+	client.PrependReactor("list", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		listAction := action.(k8stesting.ListAction)
+		namespace := listAction.GetNamespace()
+
+		switch namespace {
+		case "error-ns1":
+			return true, nil, fmt.Errorf("network timeout")
+		case "error-ns2":
+			return true, nil, fmt.Errorf("permission denied")
+		default:
+			// Let other namespaces succeed
+			return false, nil, nil
+		}
+	})
+
+	dc := &data_collector.DataCollector{
+		BaseDir:          tmpDir,
+		Namespaces:       []string{"error-ns1", "error-ns2", "success-ns"},
+		Logger:           log.New(&logOutput, "", 0),
+		K8sCoreClientSet: client,
+		PodExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+			return []byte("mock output"), nil
+		},
+	}
+
+	// Test both jobs that have the same error handling pattern
+	jobs := NGFJobList()
+
+	for _, jobName := range []string{"exec-nginx-gateway-version", "exec-nginx-t"} {
+		t.Run(jobName, func(t *testing.T) {
+			var targetJob Job
+			for _, job := range jobs {
+				if job.Name == jobName {
+					targetJob = job
+					break
+				}
+			}
+
+			// Clear log output for this subtest
+			logOutput.Reset()
+
+			ctx := context.Background()
+			ch := make(chan JobResult, 1)
+			targetJob.Execute(dc, ctx, ch)
+
+			result := <-ch
+			logContent := logOutput.String()
+
+			// Verify errors are logged for the failing namespaces
+			assert.Contains(t, logContent, "Could not retrieve pod list for namespace error-ns1: network timeout")
+			assert.Contains(t, logContent, "Could not retrieve pod list for namespace error-ns2: permission denied")
+
+			// success-ns should not have error logs
+			assert.NotContains(t, logContent, "Could not retrieve pod list for namespace success-ns")
+
+			// No files should be created since no nginx-gateway pods exist in success-ns
+			assert.Empty(t, result.Files)
+			assert.Nil(t, result.Error)
+		})
+	}
+}
+
+func TestNGFJobList_PodListError_LogFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	var logOutput bytes.Buffer
+
+	client := fake.NewClientset()
+	client.PrependReactor("list", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, fmt.Errorf("specific error message for testing")
+	})
+
+	dc := &data_collector.DataCollector{
+		BaseDir:          tmpDir,
+		Namespaces:       []string{"test-ns"},
+		Logger:           log.New(&logOutput, "", 0),
+		K8sCoreClientSet: client,
+		PodExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+			return []byte("output"), nil
+		},
+	}
+
+	jobs := NGFJobList()
+	execJob := jobs[0] // exec-nginx-gateway-version
+
+	ctx := context.Background()
+	ch := make(chan JobResult, 1)
+	execJob.Execute(dc, ctx, ch)
+
+	<-ch
+	logContent := logOutput.String()
+
+	// Verify the exact log format
+	expectedLogMessage := "\tCould not retrieve pod list for namespace test-ns: specific error message for testing"
+	assert.Contains(t, logContent, expectedLogMessage)
+
+	// Verify it starts with tab character for indentation
+	assert.Contains(t, logContent, "\tCould not retrieve pod list")
+
+	// Verify it contains the namespace and error
+	assert.Contains(t, logContent, "test-ns")
+	assert.Contains(t, logContent, "specific error message for testing")
 }

@@ -96,7 +96,7 @@ func TestCommonJobList_PodListError(t *testing.T) {
 	defer ctrl.Finish()
 
 	// Create mock clients
-	mockClient := fake.NewSimpleClientset()
+	mockClient := fake.NewClientset()
 
 	// Add a reactor that returns an error for pod list operations
 	mockClient.PrependReactor("list", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {

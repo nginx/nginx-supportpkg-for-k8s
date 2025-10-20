@@ -66,7 +66,7 @@ func TestWrapUp_CreatesTarball(t *testing.T) {
 
 func TestRealPodExecutor_ReturnsOutput(t *testing.T) {
 	dc := &DataCollector{
-		K8sCoreClientSet: fake.NewSimpleClientset(),
+		K8sCoreClientSet: fake.NewClientset(),
 		K8sRestConfig:    &rest.Config{},
 	}
 	// Replace RealPodExecutor with a mock for testing
@@ -94,7 +94,7 @@ func TestRealQueryCRD_ReturnsErrorOnInvalidConfig(t *testing.T) {
 }
 
 func TestAllNamespacesExist_AllExist(t *testing.T) {
-	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}})
+	client := fake.NewClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}})
 	dc := &DataCollector{
 		Namespaces:       []string{"default"},
 		K8sCoreClientSet: client,
@@ -106,7 +106,7 @@ func TestAllNamespacesExist_AllExist(t *testing.T) {
 }
 
 func TestAllNamespacesExist_NotExist(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	dc := &DataCollector{
 		Namespaces:       []string{"missing"},
 		K8sCoreClientSet: client,

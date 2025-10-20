@@ -34,7 +34,7 @@ func TestNICJobList_ExecJobs(t *testing.T) {
 	dc.QueryCRD = mockQueryCRD
 
 	// Use a real or fake clientset (kubernetes.Interface)
-	dc.K8sCoreClientSet = fake.NewSimpleClientset(&corev1.Pod{
+	dc.K8sCoreClientSet = fake.NewClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "ingress-pod", Namespace: "test-ns"},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
