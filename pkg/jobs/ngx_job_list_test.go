@@ -315,3 +315,395 @@ func TestNGXJobList_PodListError_vs_ExecutionError(t *testing.T) {
 		})
 	}
 }
+
+func TestNGXJobList_ExecNginxT_CreatesExpectedFiles(t *testing.T) {
+	tests := []struct {
+		name          string
+		pods          []*corev1.Pod
+		namespaces    []string
+		expectedFiles []string
+		podExecutor   func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error)
+	}{
+		{
+			name:       "single nginx pod creates one file",
+			namespaces: []string{"default"},
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "nginx-deployment-123",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "nginx", Image: "nginx:latest"},
+						},
+					},
+				},
+			},
+			expectedFiles: []string{
+				"exec/default/nginx-deployment-123__nginx-t.txt",
+			},
+			podExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+				return []byte("nginx configuration output"), nil
+			},
+		},
+		{
+			name:       "multiple nginx pods create multiple files",
+			namespaces: []string{"default", "production"},
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "nginx-web-1",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "nginx", Image: "nginx:latest"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "nginx-api-2",
+						Namespace: "production",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "nginx", Image: "nginx:latest"},
+						},
+					},
+				},
+			},
+			expectedFiles: []string{
+				"exec/default/nginx-web-1__nginx-t.txt",
+				"exec/production/nginx-api-2__nginx-t.txt",
+			},
+			podExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+				return []byte(fmt.Sprintf("nginx config for %s/%s", namespace, podName)), nil
+			},
+		},
+		{
+			name:       "non-nginx pods create no files",
+			namespaces: []string{"default"},
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "redis-deployment-456",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "redis", Image: "redis:latest"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "postgres-db-789",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "postgres", Image: "postgres:latest"},
+						},
+					},
+				},
+			},
+			expectedFiles: []string{}, // No files expected for non-nginx pods
+			podExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+				return []byte("should not be called"), nil
+			},
+		},
+		{
+			name:       "mixed pods only create files for nginx",
+			namespaces: []string{"default"},
+			pods: []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "nginx-proxy-1",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "nginx", Image: "nginx:latest"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "redis-cache-2",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "redis", Image: "redis:latest"},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "nginx-ingress-3",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "nginx", Image: "nginx:latest"},
+						},
+					},
+				},
+			},
+			expectedFiles: []string{
+				"exec/default/nginx-proxy-1__nginx-t.txt",
+				"exec/default/nginx-ingress-3__nginx-t.txt",
+			},
+			podExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+				return []byte(fmt.Sprintf("nginx config for %s", podName)), nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			var logOutput bytes.Buffer
+
+			// Create fake client with test pods
+			var runtimeObjects []runtime.Object
+			for _, pod := range tt.pods {
+				runtimeObjects = append(runtimeObjects, pod)
+			}
+			client := fake.NewSimpleClientset(runtimeObjects...)
+
+			dc := &data_collector.DataCollector{
+				BaseDir:          tmpDir,
+				Namespaces:       tt.namespaces,
+				Logger:           log.New(&logOutput, "", 0),
+				K8sCoreClientSet: client,
+				PodExecutor:      tt.podExecutor,
+			}
+
+			// Execute the job
+			jobs := NGXJobList()
+			execJob := jobs[0] // exec-nginx-t
+
+			ctx := context.Background()
+			ch := make(chan JobResult, 1)
+			execJob.Execute(dc, ctx, ch)
+
+			result := <-ch
+
+			// Verify the number of files created
+			assert.Len(t, result.Files, len(tt.expectedFiles), "Number of files should match expected")
+
+			// Verify each expected file is created
+			for _, expectedFile := range tt.expectedFiles {
+				expectedPath := filepath.Join(tmpDir, expectedFile)
+				content, exists := result.Files[expectedPath]
+				assert.True(t, exists, "Expected file should exist: %s", expectedFile)
+				assert.NotEmpty(t, content, "File content should not be empty for: %s", expectedFile)
+
+				// Verify content contains expected data
+				contentStr := string(content)
+				if strings.Contains(expectedFile, "nginx-web-1") {
+					assert.Contains(t, contentStr, "default/nginx-web-1")
+				} else if strings.Contains(expectedFile, "nginx-api-2") {
+					assert.Contains(t, contentStr, "production/nginx-api-2")
+				}
+			}
+
+			// Verify no unexpected files are created
+			for filePath := range result.Files {
+				relativePath, err := filepath.Rel(tmpDir, filePath)
+				assert.NoError(t, err)
+				assert.Contains(t, tt.expectedFiles, relativePath, "Unexpected file created: %s", relativePath)
+			}
+
+			// Verify no errors if execution was successful
+			if len(tt.expectedFiles) > 0 {
+				assert.Nil(t, result.Error, "Should not have errors for successful execution")
+			}
+		})
+	}
+}
+
+func TestNGXJobList_ExecNginxT_FileContents(t *testing.T) {
+	tmpDir := t.TempDir()
+	var logOutput bytes.Buffer
+
+	nginxPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nginx-test-pod",
+			Namespace: "default",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: "nginx", Image: "nginx:latest"},
+			},
+		},
+	}
+
+	client := fake.NewSimpleClientset(nginxPod)
+
+	expectedConfig := `server {
+    listen 80;
+    server_name example.com;
+    location / {
+        proxy_pass http://backend;
+    }
+}`
+
+	dc := &data_collector.DataCollector{
+		BaseDir:          tmpDir,
+		Namespaces:       []string{"default"},
+		Logger:           log.New(&logOutput, "", 0),
+		K8sCoreClientSet: client,
+		PodExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+			// Verify the correct command is passed
+			assert.Equal(t, []string{"/usr/sbin/nginx", "-T"}, command)
+			assert.Equal(t, "default", namespace)
+			assert.Equal(t, "nginx-test-pod", podName)
+			assert.Equal(t, "nginx", containerName)
+
+			return []byte(expectedConfig), nil
+		},
+	}
+
+	jobs := NGXJobList()
+	execJob := jobs[0]
+
+	ctx := context.Background()
+	ch := make(chan JobResult, 1)
+	execJob.Execute(dc, ctx, ch)
+
+	result := <-ch
+
+	// Verify file is created with correct content
+	assert.Len(t, result.Files, 1)
+
+	expectedPath := filepath.Join(tmpDir, "exec/default/nginx-test-pod__nginx-t.txt")
+	content, exists := result.Files[expectedPath]
+	assert.True(t, exists, "Expected file should exist")
+	assert.Equal(t, expectedConfig, string(content), "File content should match expected nginx config")
+}
+
+func TestNGXJobList_ExecNginxT_FilePaths(t *testing.T) {
+	tests := []struct {
+		name         string
+		podName      string
+		namespace    string
+		expectedPath string
+	}{
+		{
+			name:         "standard pod name",
+			podName:      "nginx-deployment-abc123",
+			namespace:    "default",
+			expectedPath: "exec/default/nginx-deployment-abc123__nginx-t.txt",
+		},
+		{
+			name:         "pod with dashes",
+			podName:      "nginx-ingress-controller-xyz",
+			namespace:    "ingress-nginx",
+			expectedPath: "exec/ingress-nginx/nginx-ingress-controller-xyz__nginx-t.txt",
+		},
+		{
+			name:         "short pod name",
+			podName:      "nginx-1",
+			namespace:    "prod",
+			expectedPath: "exec/prod/nginx-1__nginx-t.txt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			var logOutput bytes.Buffer
+
+			nginxPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tt.podName,
+					Namespace: tt.namespace,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "nginx", Image: "nginx:latest"},
+					},
+				},
+			}
+
+			client := fake.NewSimpleClientset(nginxPod)
+
+			dc := &data_collector.DataCollector{
+				BaseDir:          tmpDir,
+				Namespaces:       []string{tt.namespace},
+				Logger:           log.New(&logOutput, "", 0),
+				K8sCoreClientSet: client,
+				PodExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+					return []byte("nginx config"), nil
+				},
+			}
+
+			jobs := NGXJobList()
+			execJob := jobs[0]
+
+			ctx := context.Background()
+			ch := make(chan JobResult, 1)
+			execJob.Execute(dc, ctx, ch)
+
+			result := <-ch
+
+			// Verify the file path is constructed correctly
+			expectedFullPath := filepath.Join(tmpDir, tt.expectedPath)
+			content, exists := result.Files[expectedFullPath]
+			assert.True(t, exists, "File should exist at expected path: %s", tt.expectedPath)
+			assert.Equal(t, "nginx config", string(content))
+		})
+	}
+}
+
+func TestNGXJobList_ExecNginxT_NoFilesOnError(t *testing.T) {
+	tmpDir := t.TempDir()
+	var logOutput bytes.Buffer
+
+	nginxPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nginx-pod",
+			Namespace: "default",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: "nginx", Image: "nginx:latest"},
+			},
+		},
+	}
+
+	client := fake.NewSimpleClientset(nginxPod)
+
+	dc := &data_collector.DataCollector{
+		BaseDir:          tmpDir,
+		Namespaces:       []string{"default"},
+		Logger:           log.New(&logOutput, "", 0),
+		K8sCoreClientSet: client,
+		PodExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+			return nil, fmt.Errorf("command execution failed")
+		},
+	}
+
+	jobs := NGXJobList()
+	execJob := jobs[0]
+
+	ctx := context.Background()
+	ch := make(chan JobResult, 1)
+	execJob.Execute(dc, ctx, ch)
+
+	result := <-ch
+
+	// Verify no files are created when command execution fails
+	assert.Empty(t, result.Files, "No files should be created when command execution fails")
+	assert.NotNil(t, result.Error, "Error should be set when command execution fails")
+
+	// Verify error is logged
+	logContent := logOutput.String()
+	assert.Contains(t, logContent, "Command execution")
+	assert.Contains(t, logContent, "failed for pod nginx-pod")
+	assert.Contains(t, logContent, "command execution failed")
+}
