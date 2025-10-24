@@ -7,3 +7,11 @@ nginx-utils:
 
 install: build
 	sudo cp cmd/kubectl-nginx_supportpkg /usr/local/bin
+
+clean:
+	rm -f cmd/kubectl-nginx_supportpkg
+
+test:
+	go clean -testcache && go test -v ./... -coverprofile=coverage.out
+	go tool cover -func=coverage.out
+	go tool cover -html=coverage.out -o coverage.html

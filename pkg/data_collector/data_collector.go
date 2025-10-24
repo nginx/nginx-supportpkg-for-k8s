@@ -35,6 +35,7 @@ import (
 	helmClient "github.com/mittwald/go-helm-client"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdClient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -53,12 +54,14 @@ type DataCollector struct {
 	Logger                *log.Logger
 	LogFile               *os.File
 	K8sRestConfig         *rest.Config
-	K8sCoreClientSet      *kubernetes.Clientset
-	K8sCrdClientSet       *crdClient.Clientset
-	K8sMetricsClientSet   *metricsClient.Clientset
+	K8sCoreClientSet      kubernetes.Interface
+	K8sCrdClientSet       apiextensionsclientset.Interface
+	K8sMetricsClientSet   metricsClient.Interface
 	K8sHelmClientSet      map[string]helmClient.Client
 	ExcludeDBData         bool
 	ExcludeTimeSeriesData bool
+	PodExecutor           func(namespace, pod, container string, command []string, ctx context.Context) ([]byte, error)
+	QueryCRD              func(crd crds.Crd, namespace string, ctx context.Context) ([]byte, error)
 }
 
 type Manifest struct {
@@ -148,6 +151,8 @@ func NewDataCollector(collector *DataCollector) error {
 	collector.LogFile = logFile
 	collector.Logger = log.New(logFile, "", log.LstdFlags|log.LUTC|log.Lmicroseconds|log.Lshortfile)
 	collector.K8sHelmClientSet = make(map[string]helmClient.Client)
+	collector.PodExecutor = collector.RealPodExecutor
+	collector.QueryCRD = collector.RealQueryCRD
 
 	//Initialize clients
 	collector.K8sRestConfig = config
@@ -260,7 +265,7 @@ func (c *DataCollector) WrapUp(product string) (string, error) {
 	return tarballName, nil
 }
 
-func (c *DataCollector) PodExecutor(namespace string, pod string, container string, command []string, ctx context.Context) ([]byte, error) {
+func (c *DataCollector) RealPodExecutor(namespace string, pod string, container string, command []string, ctx context.Context) ([]byte, error) {
 	req := c.K8sCoreClientSet.CoreV1().RESTClient().Post().
 		Namespace(namespace).
 		Resource("pods").
@@ -293,7 +298,7 @@ func (c *DataCollector) PodExecutor(namespace string, pod string, container stri
 	}
 }
 
-func (c *DataCollector) QueryCRD(crd crds.Crd, namespace string, ctx context.Context) ([]byte, error) {
+func (c *DataCollector) RealQueryCRD(crd crds.Crd, namespace string, ctx context.Context) ([]byte, error) {
 
 	schemeGroupVersion := schema.GroupVersion{Group: crd.Group, Version: crd.Version}
 	negotiatedSerializer := scheme.Codecs.WithoutConversion()
