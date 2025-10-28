@@ -232,7 +232,6 @@ func NICJobList() []Job {
 											} else {
 												jobResult.Files[filepath.Join(dc.BaseDir, fileName)] = jsonBytes
 											}
-											ch <- jobResult
 										}
 									}
 								}
@@ -240,6 +239,7 @@ func NICJobList() []Job {
 						}
 					}
 				}
+				ch <- jobResult
 			},
 		},
 	}
