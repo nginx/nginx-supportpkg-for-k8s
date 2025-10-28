@@ -73,6 +73,9 @@ func TestNGXJobList_ExecNginxT(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("job execution timed out")
+
+	default:
+		t.Fatalf("job %s did not return result", job.Name)
 	}
 }
 

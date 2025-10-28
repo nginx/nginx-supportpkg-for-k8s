@@ -53,6 +53,10 @@ func TestCommonJobList_SelectedJobsProduceFiles(t *testing.T) {
 			}
 		case <-ctx.Done():
 			t.Fatalf("job %s timed out", job.Name)
+
+		default:
+			// No result yet, which is unexpected since we set a timeout above
+			t.Fatalf("job %s did not return result", job.Name)
 		}
 	}
 }

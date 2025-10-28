@@ -103,6 +103,9 @@ func TestNIMJobList_ExecJobs(t *testing.T) {
 			}
 		case <-time.After(2 * time.Second):
 			t.Errorf("Job %s timed out", job.Name)
+
+		default:
+			t.Errorf("Job %s did not return result", job.Name)
 		}
 	}
 }
@@ -135,6 +138,9 @@ func TestNIMJobList_ExcludeFlags(t *testing.T) {
 				}
 			case <-time.After(time.Second):
 				t.Fatal("Job exec-clickhouse-data timed out")
+
+			default:
+				t.Fatalf("Job %s did not return result", job.Name)
 			}
 		}
 	}
@@ -152,6 +158,9 @@ func TestNIMJobList_ExcludeFlags(t *testing.T) {
 				}
 			case <-time.After(time.Second):
 				t.Fatal("Job exec-dqlite-dump timed out")
+
+			default:
+				t.Fatalf("Job %s did not return result", job.Name)
 			}
 		}
 	}
