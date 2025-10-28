@@ -69,9 +69,6 @@ func TestNICJobList_ExecJobs(t *testing.T) {
 			}
 		case <-time.After(time.Second):
 			t.Errorf("Job %s timed out", job.Name)
-
-		default:
-			t.Errorf("Job %s did not return result", job.Name)
 		}
 	}
 }
@@ -104,9 +101,6 @@ func TestNICJobList_CRDObjects(t *testing.T) {
 				}
 			case <-time.After(time.Second):
 				t.Errorf("CRD job timed out")
-
-			default:
-				t.Errorf("CRD job %s did not return result", job.Name)
 			}
 		}
 	}
@@ -186,9 +180,6 @@ func TestNICJobList_CRDObjects_QueryFailure(t *testing.T) {
 
 	case <-ctx.Done():
 		t.Fatal("CRD job timed out")
-
-	default:
-		t.Fatalf("CRD job %s did not return result", crdJob.Name)
 	}
 }
 
@@ -497,9 +488,6 @@ func TestNICJobList_CommandExecutionFailure(t *testing.T) {
 
 			case <-ctx.Done():
 				t.Fatalf("Job %s timed out", tt.jobName)
-
-			default:
-				t.Fatalf("Job %s did not return result", tt.jobName)
 			}
 		})
 	}
@@ -566,8 +554,5 @@ func TestNICJobList_CollectProductPlatformInfo_JSONMarshalFailure(t *testing.T) 
 
 	case <-ctx.Done():
 		t.Fatal("Job timed out")
-
-	default:
-		t.Fatalf("Job %s did not return result", job.Name)
 	}
 }
