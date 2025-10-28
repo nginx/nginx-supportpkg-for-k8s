@@ -146,7 +146,14 @@ func CommonJobList() []Job {
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
 				for _, namespace := range dc.Namespaces {
-					result, err := dc.K8sCoreClientSet.Discovery().ServerPreferredResources()
+					discoveryClient, ok := dc.K8sCoreClientSet.Discovery().(interface {
+						ServerPreferredResources() ([]*metav1.APIResourceList, error)
+					})
+					if !ok {
+						dc.Logger.Printf("\tDiscovery() does not implement ServerPreferredResources for namespace %s\n", namespace)
+						continue
+					}
+					result, err := discoveryClient.ServerPreferredResources()
 					if err != nil {
 						dc.Logger.Printf("\tCould not retrieve API resources list %s: %v\n", namespace, err)
 					} else {
