@@ -497,3 +497,125 @@ func TestNIMJobList_DqliteDump_SkippedVsPodListError(t *testing.T) {
 		})
 	}
 }
+
+func TestNIMJobList_CommandExecutionFailure(t *testing.T) {
+	tests := []struct {
+		name              string
+		jobName           string
+		jobIndex          int
+		podNamePattern    string
+		expectedContainer string
+		expectedCommands  [][]string
+	}{
+		{
+			name:              "exec-apigw-nginx-t command failure",
+			jobName:           "exec-apigw-nginx-t",
+			jobIndex:          0,
+			podNamePattern:    "apigw",
+			expectedContainer: "apigw",
+			expectedCommands:  [][]string{{"/usr/sbin/nginx", "-T"}},
+		},
+		{
+			name:              "exec-apigw-nginx-version command failure",
+			jobName:           "exec-apigw-nginx-version",
+			jobIndex:          1,
+			podNamePattern:    "apigw",
+			expectedContainer: "apigw",
+			expectedCommands:  [][]string{{"/usr/sbin/nginx", "-v"}},
+		},
+		{
+			name:              "exec-clickhouse-version command failure",
+			jobName:           "exec-clickhouse-version",
+			jobIndex:          2,
+			podNamePattern:    "clickhouse",
+			expectedContainer: "clickhouse-server",
+			expectedCommands:  [][]string{{"clickhouse-server", "--version"}},
+		},
+		{
+			name:              "exec-dqlite-dump command failure",
+			jobName:           "exec-dqlite-dump",
+			jobIndex:          4,
+			podNamePattern:    "core",
+			expectedContainer: "core",
+			expectedCommands: [][]string{
+				{"/etc/nms/scripts/dqlite-backup", "-n", "core", "-c", "/etc/nms/nms.conf", "-a", "0.0.0.0:7891", "-o", "/tmp/core.sql", "-k"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			var logOutput bytes.Buffer
+
+			// Create pod matching the pattern
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tt.podNamePattern + "-test-pod",
+					Namespace: "default",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: tt.expectedContainer, Image: "test:latest"},
+					},
+				},
+			}
+
+			client := fake.NewSimpleClientset(pod)
+
+			var executedCommands [][]string
+			dc := &data_collector.DataCollector{
+				BaseDir:          tmpDir,
+				Namespaces:       []string{"default"},
+				Logger:           log.New(&logOutput, "", 0),
+				K8sCoreClientSet: client,
+				PodExecutor: func(namespace, podName, containerName string, command []string, ctx context.Context) ([]byte, error) {
+					// Track executed commands
+					executedCommands = append(executedCommands, command)
+
+					// Verify correct parameters
+					assert.Equal(t, "default", namespace)
+					assert.Equal(t, tt.podNamePattern+"-test-pod", podName)
+					assert.Equal(t, tt.expectedContainer, containerName)
+
+					// Return error to test failure path
+					return nil, fmt.Errorf("command execution failed: %v", command)
+				},
+			}
+
+			// Execute the specific job
+			jobs := NIMJobList()
+			job := jobs[tt.jobIndex]
+			assert.Equal(t, tt.jobName, job.Name)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			ch := make(chan JobResult, 1)
+			go job.Execute(dc, ctx, ch)
+
+			select {
+			case result := <-ch:
+				logContent := logOutput.String()
+
+				// Verify the error was set
+				assert.NotNil(t, result.Error, "Job should have error when command execution fails")
+				assert.Contains(t, result.Error.Error(), "command execution failed")
+
+				// Verify the error was logged
+				assert.Contains(t, logContent, "Command execution")
+				assert.Contains(t, logContent, "failed for pod")
+				assert.Contains(t, logContent, "command execution failed")
+
+				// Verify no files were created when command execution fails
+				assert.Empty(t, result.Files, "No files should be created when command execution fails")
+
+				// Verify expected commands were called
+				assert.NotEmpty(t, executedCommands, "Should have executed commands")
+
+			case <-ctx.Done():
+				t.Fatalf("Job %s timed out", tt.jobName)
+			}
+		})
+	}
+}
