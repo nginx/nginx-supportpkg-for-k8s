@@ -1,0 +1,48 @@
+name: Unit Tests
+permissions:
+  contents: read
+
+on:
+  push:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.24"
+
+      - name: Create fake kube config
+        run: |
+          mkdir -p /home/runner/.kube
+          cat <<EOF > /home/runner/.kube/config
+          apiVersion: v1
+          kind: Config
+          preferences: {}
+          clusters:
+            - cluster:
+                server: https://fake-server
+                certificate-authority-data: FAKE
+              name: fake-cluster
+          contexts:
+            - context:
+                cluster: fake-cluster
+                user: fake-user
+              name: fake-context
+          current-context: fake-context
+          users:
+            - name: fake-user
+              user:
+                token: FAKE
+          EOF
+      - name: Run Unit Tests
+        run: |
+          go clean -testcache && go test -v ./... -coverprofile=coverage.out
+          go tool cover -func=coverage.out
+          go tool cover -html=coverage.out -o coverage.html
