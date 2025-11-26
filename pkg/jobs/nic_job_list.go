@@ -76,94 +76,6 @@ func getNginxIngressPod(dc *data_collector.DataCollector, ctx context.Context) (
 func NICJobList() []Job {
 	jobList := []Job{
 		{
-			Name:    "parse-entitlement",
-			Timeout: time.Second * 10,
-			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
-				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
-
-				ingressPod, err := getNginxIngressPod(dc, ctx)
-				if err != nil {
-					dc.Logger.Printf("\tCould not find nginx-ingress pod: %v\n", err)
-					jobResult.Error = err
-					ch <- jobResult
-					return
-				}
-
-				for _, container := range ingressPod.Spec.Containers {
-					if container.Name == "nginx-ingress" {
-						for _, arg := range container.Args {
-							if strings.Contains(arg, "mgmt-configmap") {
-								configMapString := strings.SplitN(arg, "=", 2)
-								if len(configMapString) != 2 {
-									dc.Logger.Printf("\tCould not parse mgmt-configmap argument: %s\n", arg)
-									jobResult.Error = fmt.Errorf("could not parse mgmt-configmap argument: %s", arg)
-									ch <- jobResult
-									return
-								}
-								configMapName := strings.Split(configMapString[1], "/")[1]
-								configMapNamespace := strings.Replace(strings.Split(configMapString[1], "/")[0], "$(POD_NAMESPACE)", ingressPod.Namespace, 1)
-
-								configMap, err := dc.K8sCoreClientSet.CoreV1().ConfigMaps(configMapNamespace).Get(ctx, configMapName, metav1.GetOptions{})
-								if err != nil {
-									dc.Logger.Printf("\tCould not retrieve ConfigMap %s in namespace %s: %v\n", configMapName, configMapNamespace, err)
-									jobResult.Error = err
-									ch <- jobResult
-									return
-								}
-
-								licenseTokenSecretName, exists := configMap.Data["license-token-secret-name"]
-								if !exists {
-									dc.Logger.Printf("\tConfigMap %s in namespace %s does not contain 'license-token-secret-name' key\n", configMapName, configMapNamespace)
-									jobResult.Error = fmt.Errorf("configmap %s in namespace %s does not contain 'license-token-secret-name' key", configMapName, configMapNamespace)
-									ch <- jobResult
-									return
-								}
-
-								licenseTokenSecret, err := dc.K8sCoreClientSet.CoreV1().Secrets(configMapNamespace).Get(ctx, licenseTokenSecretName, metav1.GetOptions{})
-								if err != nil {
-									dc.Logger.Printf("\tCould not retrieve Secret %s in namespace %s: %v\n", licenseTokenSecretName, configMapNamespace, err)
-									jobResult.Error = err
-									ch <- jobResult
-									return
-								}
-
-								licenseToken, exists := licenseTokenSecret.Data["license.jwt"]
-								if !exists {
-									dc.Logger.Printf("\tSecret %s in namespace %s does not contain 'license.jwt' key\n", licenseTokenSecretName, configMapNamespace)
-									jobResult.Error = fmt.Errorf("secret %s in namespace %s does not contain 'license.jwt' key", licenseTokenSecretName, configMapNamespace)
-									ch <- jobResult
-									return
-								}
-
-								claim := strings.Split(string(licenseToken), ".")[1]
-								decodedClaim, err := base64.RawStdEncoding.DecodeString(claim)
-								if err != nil {
-									dc.Logger.Printf("\tCould not decode license token claim from Secret %s in namespace %s: %v\n", licenseTokenSecretName, configMapNamespace, err)
-									jobResult.Error = err
-									ch <- jobResult
-									return
-								}
-
-								var prettyJSON bytes.Buffer
-								err = json.Indent(&prettyJSON, decodedClaim, "", "  ")
-								if err != nil {
-									dc.Logger.Printf("\tCould not format license token claim JSON from Secret %s in namespace %s: %v\n", licenseTokenSecretName, configMapNamespace, err)
-									jobResult.Error = err
-									ch <- jobResult
-									return
-								}
-
-								fileName := fmt.Sprintf("%s_payload.json", licenseTokenSecretName)
-								jobResult.Files[filepath.Join(dc.BaseDir, "entitlement", ingressPod.Namespace, fileName)] = prettyJSON.Bytes()
-								break
-							}
-						}
-					}
-				}
-				ch <- jobResult
-			},
-		},
-		{
 			Name:    "exec-nginx-ingress-version",
 			Timeout: time.Second * 10,
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
@@ -342,6 +254,94 @@ func NICJobList() []Job {
 										}
 									}
 								}
+							}
+						}
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "parse-entitlement",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+
+				ingressPod, err := getNginxIngressPod(dc, ctx)
+				if err != nil {
+					dc.Logger.Printf("\tCould not find nginx-ingress pod: %v\n", err)
+					jobResult.Error = err
+					ch <- jobResult
+					return
+				}
+
+				for _, container := range ingressPod.Spec.Containers {
+					if container.Name == "nginx-ingress" {
+						for _, arg := range container.Args {
+							if strings.Contains(arg, "mgmt-configmap") {
+								configMapString := strings.SplitN(arg, "=", 2)
+								if len(configMapString) != 2 {
+									dc.Logger.Printf("\tCould not parse mgmt-configmap argument: %s\n", arg)
+									jobResult.Error = fmt.Errorf("could not parse mgmt-configmap argument: %s", arg)
+									ch <- jobResult
+									return
+								}
+								configMapName := strings.Split(configMapString[1], "/")[1]
+								configMapNamespace := strings.Replace(strings.Split(configMapString[1], "/")[0], "$(POD_NAMESPACE)", ingressPod.Namespace, 1)
+
+								configMap, err := dc.K8sCoreClientSet.CoreV1().ConfigMaps(configMapNamespace).Get(ctx, configMapName, metav1.GetOptions{})
+								if err != nil {
+									dc.Logger.Printf("\tCould not retrieve ConfigMap %s in namespace %s: %v\n", configMapName, configMapNamespace, err)
+									jobResult.Error = err
+									ch <- jobResult
+									return
+								}
+
+								licenseTokenSecretName, exists := configMap.Data["license-token-secret-name"]
+								if !exists {
+									dc.Logger.Printf("\tConfigMap %s in namespace %s does not contain 'license-token-secret-name' key\n", configMapName, configMapNamespace)
+									jobResult.Error = fmt.Errorf("configmap %s in namespace %s does not contain 'license-token-secret-name' key", configMapName, configMapNamespace)
+									ch <- jobResult
+									return
+								}
+
+								licenseTokenSecret, err := dc.K8sCoreClientSet.CoreV1().Secrets(configMapNamespace).Get(ctx, licenseTokenSecretName, metav1.GetOptions{})
+								if err != nil {
+									dc.Logger.Printf("\tCould not retrieve Secret %s in namespace %s: %v\n", licenseTokenSecretName, configMapNamespace, err)
+									jobResult.Error = err
+									ch <- jobResult
+									return
+								}
+
+								licenseToken, exists := licenseTokenSecret.Data["license.jwt"]
+								if !exists {
+									dc.Logger.Printf("\tSecret %s in namespace %s does not contain 'license.jwt' key\n", licenseTokenSecretName, configMapNamespace)
+									jobResult.Error = fmt.Errorf("secret %s in namespace %s does not contain 'license.jwt' key", licenseTokenSecretName, configMapNamespace)
+									ch <- jobResult
+									return
+								}
+
+								claim := strings.Split(string(licenseToken), ".")[1]
+								decodedClaim, err := base64.RawStdEncoding.DecodeString(claim)
+								if err != nil {
+									dc.Logger.Printf("\tCould not decode license token claim from Secret %s in namespace %s: %v\n", licenseTokenSecretName, configMapNamespace, err)
+									jobResult.Error = err
+									ch <- jobResult
+									return
+								}
+
+								var prettyJSON bytes.Buffer
+								err = json.Indent(&prettyJSON, decodedClaim, "", "  ")
+								if err != nil {
+									dc.Logger.Printf("\tCould not format license token claim JSON from Secret %s in namespace %s: %v\n", licenseTokenSecretName, configMapNamespace, err)
+									jobResult.Error = err
+									ch <- jobResult
+									return
+								}
+
+								fileName := fmt.Sprintf("%s_payload.json", licenseTokenSecretName)
+								jobResult.Files[filepath.Join(dc.BaseDir, "entitlement", ingressPod.Namespace, fileName)] = prettyJSON.Bytes()
+								break
 							}
 						}
 					}
