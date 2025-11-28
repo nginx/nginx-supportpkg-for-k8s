@@ -98,11 +98,6 @@ func GetNGFCRDList() []Crd {
 			Version:  "v1alpha1",
 		},
 		{
-			Resource: "observabilitypolicies",
-			Group:    "gateway.nginx.org",
-			Version:  "v1alpha1",
-		},
-		{
 			Resource: "snippetsfilters",
 			Group:    "gateway.nginx.org",
 			Version:  "v1alpha1",
