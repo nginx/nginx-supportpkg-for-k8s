@@ -21,6 +21,7 @@ package jobs
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/crds"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -52,6 +54,23 @@ func ParseNginxIngressProductInfo(res []byte) data_collector.ProductInfo {
 		productInfo.Build = string(matches[1])
 	}
 	return productInfo
+}
+
+// Returns the first found pod with the 'ingress' substring in its name
+func getNginxIngressPod(dc *data_collector.DataCollector, ctx context.Context) (v1.Pod, error) {
+	for _, namespace := range dc.Namespaces {
+		pods, err := dc.K8sCoreClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			dc.Logger.Printf("\tCould not retrieve pod list for namespace %s: %v\n", namespace, err)
+		} else {
+			for _, pod := range pods.Items {
+				if strings.Contains(pod.Name, "ingress") {
+					return pod, nil
+				}
+			}
+		}
+	}
+	return v1.Pod{}, fmt.Errorf("no nginx-ingress pod found in the provided namespaces")
 }
 
 func NICJobList() []Job {
@@ -235,6 +254,94 @@ func NICJobList() []Job {
 										}
 									}
 								}
+							}
+						}
+					}
+				}
+				ch <- jobResult
+			},
+		},
+		{
+			Name:    "parse-entitlement",
+			Timeout: time.Second * 10,
+			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
+				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
+
+				ingressPod, err := getNginxIngressPod(dc, ctx)
+				if err != nil {
+					dc.Logger.Printf("\tCould not find nginx-ingress pod: %v\n", err)
+					jobResult.Error = err
+					ch <- jobResult
+					return
+				}
+
+				for _, container := range ingressPod.Spec.Containers {
+					if container.Name == "nginx-ingress" {
+						for _, arg := range container.Args {
+							if strings.Contains(arg, "mgmt-configmap") {
+								configMapString := strings.SplitN(arg, "=", 2)
+								if len(configMapString) != 2 {
+									dc.Logger.Printf("\tCould not parse mgmt-configmap argument: %s\n", arg)
+									jobResult.Error = fmt.Errorf("could not parse mgmt-configmap argument: %s", arg)
+									ch <- jobResult
+									return
+								}
+								configMapName := strings.Split(configMapString[1], "/")[1]
+								configMapNamespace := strings.Replace(strings.Split(configMapString[1], "/")[0], "$(POD_NAMESPACE)", ingressPod.Namespace, 1)
+
+								configMap, err := dc.K8sCoreClientSet.CoreV1().ConfigMaps(configMapNamespace).Get(ctx, configMapName, metav1.GetOptions{})
+								if err != nil {
+									dc.Logger.Printf("\tCould not retrieve ConfigMap %s in namespace %s: %v\n", configMapName, configMapNamespace, err)
+									jobResult.Error = err
+									ch <- jobResult
+									return
+								}
+
+								licenseTokenSecretName, exists := configMap.Data["license-token-secret-name"]
+								if !exists {
+									dc.Logger.Printf("\tConfigMap %s in namespace %s does not contain 'license-token-secret-name' key\n", configMapName, configMapNamespace)
+									jobResult.Error = fmt.Errorf("configmap %s in namespace %s does not contain 'license-token-secret-name' key", configMapName, configMapNamespace)
+									ch <- jobResult
+									return
+								}
+
+								licenseTokenSecret, err := dc.K8sCoreClientSet.CoreV1().Secrets(configMapNamespace).Get(ctx, licenseTokenSecretName, metav1.GetOptions{})
+								if err != nil {
+									dc.Logger.Printf("\tCould not retrieve Secret %s in namespace %s: %v\n", licenseTokenSecretName, configMapNamespace, err)
+									jobResult.Error = err
+									ch <- jobResult
+									return
+								}
+
+								licenseToken, exists := licenseTokenSecret.Data["license.jwt"]
+								if !exists {
+									dc.Logger.Printf("\tSecret %s in namespace %s does not contain 'license.jwt' key\n", licenseTokenSecretName, configMapNamespace)
+									jobResult.Error = fmt.Errorf("secret %s in namespace %s does not contain 'license.jwt' key", licenseTokenSecretName, configMapNamespace)
+									ch <- jobResult
+									return
+								}
+
+								claim := strings.Split(string(licenseToken), ".")[1]
+								decodedClaim, err := base64.RawStdEncoding.DecodeString(claim)
+								if err != nil {
+									dc.Logger.Printf("\tCould not decode license token claim from Secret %s in namespace %s: %v\n", licenseTokenSecretName, configMapNamespace, err)
+									jobResult.Error = err
+									ch <- jobResult
+									return
+								}
+
+								var prettyJSON bytes.Buffer
+								err = json.Indent(&prettyJSON, decodedClaim, "", "  ")
+								if err != nil {
+									dc.Logger.Printf("\tCould not format license token claim JSON from Secret %s in namespace %s: %v\n", licenseTokenSecretName, configMapNamespace, err)
+									jobResult.Error = err
+									ch <- jobResult
+									return
+								}
+
+								fileName := fmt.Sprintf("%s_payload.json", licenseTokenSecretName)
+								jobResult.Files[filepath.Join(dc.BaseDir, "entitlement", ingressPod.Namespace, fileName)] = prettyJSON.Bytes()
+								break
 							}
 						}
 					}
