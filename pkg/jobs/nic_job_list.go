@@ -89,7 +89,7 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									if container.Name == "ingress" {
+									if strings.Contains(container.Name, "ingress") {
 										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
 										if err != nil {
 											jobResult.Error = err
