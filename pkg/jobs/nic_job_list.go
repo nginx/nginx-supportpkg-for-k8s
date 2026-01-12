@@ -89,7 +89,7 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									if container.Name == "nginx-ingress" {
+									if strings.Contains(container.Name, "ingress") {
 										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
 										if err != nil {
 											jobResult.Error = err
@@ -121,7 +121,7 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									if container.Name == "nginx-ingress" {
+									if strings.Contains(container.Name, "ingress") {
 										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
 										if err != nil {
 											jobResult.Error = err
@@ -153,7 +153,7 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									if container.Name == "nginx-ingress" {
+									if strings.Contains(container.Name, "ingress") {
 										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
 										if err != nil {
 											jobResult.Error = err
@@ -185,7 +185,7 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									if container.Name == "nginx-ingress" {
+									if strings.Contains(container.Name, "ingress") {
 										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
 										if err != nil {
 											jobResult.Error = err
@@ -237,7 +237,7 @@ func NICJobList() []Job {
 						for _, pod := range pods.Items {
 							if strings.Contains(pod.Name, "ingress") {
 								for _, container := range pod.Spec.Containers {
-									if container.Name == "nginx-ingress" {
+									if strings.Contains(container.Name, "ingress") {
 										res, err := dc.PodExecutor(namespace, pod.Name, container.Name, command, ctx)
 										if err != nil {
 											jobResult.Error = err
@@ -276,7 +276,7 @@ func NICJobList() []Job {
 				}
 
 				for _, container := range ingressPod.Spec.Containers {
-					if container.Name == "nginx-ingress" {
+					if strings.Contains(container.Name, "ingress") {
 						for _, arg := range container.Args {
 							if strings.Contains(arg, "mgmt-configmap") {
 								configMapString := strings.SplitN(arg, "=", 2)
@@ -339,8 +339,8 @@ func NICJobList() []Job {
 									return
 								}
 
-								fileName := fmt.Sprintf("%s_payload.json", licenseTokenSecretName)
-								jobResult.Files[filepath.Join(dc.BaseDir, "entitlement", ingressPod.Namespace, fileName)] = prettyJSON.Bytes()
+								//fileName := fmt.Sprintf("%s_payload.json", licenseTokenSecretName)
+								jobResult.Files[filepath.Join(dc.BaseDir, "entitlement", "payload.json")] = prettyJSON.Bytes()
 								break
 							}
 						}

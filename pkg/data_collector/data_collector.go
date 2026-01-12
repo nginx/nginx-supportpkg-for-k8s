@@ -70,6 +70,7 @@ type Manifest struct {
 	PackageType  string        `json:"package_type"`
 	RootDir      string        `json:"root_dir,omitempty"`
 	Commands     []Command     `json:"commands,omitempty"`
+	Entitlement  any           `json:"entitlement,omitempty"`
 	ProductInfo  ProductInfo   `json:"product_info"`
 	PlatformInfo PlatformInfo  `json:"platform_info"`
 	Packages     []SubPackage  `json:"packages,omitempty"`
@@ -348,6 +349,7 @@ func (c *DataCollector) GenerateManifest(product string, startTime time.Time, jo
 		}
 	}
 
+	// Read and parse platform_info.json
 	filename = filepath.Join(c.BaseDir, "platform_info.json")
 	file, err = os.Open(filename)
 	var platformInfo PlatformInfo
@@ -360,6 +362,21 @@ func (c *DataCollector) GenerateManifest(product string, startTime time.Time, jo
 			c.Logger.Printf("Warning: failed to decode platform_info.json: %v. Using default values.", err)
 		}
 	}
+
+	// Read and parse entitlement data
+	filename = filepath.Join(c.BaseDir, "entitlement", "payload.json")
+	file, err = os.Open(filename)
+	var entitlement any
+	if err != nil {
+		c.Logger.Printf("Warning: failed to open entitlement.json: %v. Using default values.", err)
+	} else {
+		defer file.Close()
+		decoder := json.NewDecoder(file)
+		if err = decoder.Decode(&entitlement); err != nil {
+			c.Logger.Printf("Warning: failed to decode entitlement.json: %v. Using default values.", err)
+		}
+	}
+
 	manifest := Manifest{
 		Version: "1.2", // Match the schema version
 		Timestamp: TimestampInfo{
@@ -371,6 +388,7 @@ func (c *DataCollector) GenerateManifest(product string, startTime time.Time, jo
 		ProductInfo:  info,
 		PlatformInfo: platformInfo,
 		Commands:     []Command{},
+		Entitlement:  entitlement,
 	}
 
 	// Convert job timings to commands format
