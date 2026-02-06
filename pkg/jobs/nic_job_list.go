@@ -109,7 +109,7 @@ func NICJobList() []Job {
 		},
 		{
 			Name:    "exec-nginx-t",
-			Timeout: time.Second * 10,
+			Timeout: time.Second * 30,
 			Execute: func(dc *data_collector.DataCollector, ctx context.Context, ch chan JobResult) {
 				jobResult := JobResult{Files: make(map[string][]byte), Error: nil}
 				command := []string{"/usr/sbin/nginx", "-T"}

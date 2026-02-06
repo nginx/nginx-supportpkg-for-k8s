@@ -444,9 +444,18 @@ func CommonJobList() []Job {
 
 					var hostname string
 					var platformType string
+					if len(nodeList.Items) > 0 {
+						// Establish a default hostname and platformType
+						hostname = nodeList.Items[0].ObjectMeta.Name
+						platformType = fmt.Sprintf("%s %s/%s",
+							nodeList.Items[0].Status.NodeInfo.OSImage,
+							nodeList.Items[0].Status.NodeInfo.OperatingSystem,
+							nodeList.Items[0].Status.NodeInfo.Architecture)
+					}
+
+					// If a control-plane node is found, use its information for hostname and platformType
 					for _, node := range nodeList.Items {
 						labels := node.ObjectMeta.Labels
-						// If the node does NOT have the control-plane label, include its name
 						if _, exists := labels["node-role.kubernetes.io/control-plane"]; exists {
 							hostname = node.ObjectMeta.Name
 							osImage := node.Status.NodeInfo.OSImage
