@@ -154,7 +154,7 @@ func UploadToIHealth(dc *DataCollector, packagePath string) error {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+dc.IHealthCreds.Token)
 	req.Header.Set("Accept", "application/vnd.f5.ihealth.api")
-	req.Header.Set("User-Agent", "MyGreatiHealthClient")
+	req.Header.Set("User-Agent", "nginx-supportpkg-for-k8s")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
