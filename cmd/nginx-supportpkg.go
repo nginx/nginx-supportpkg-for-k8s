@@ -61,6 +61,8 @@ func Execute() {
 			if uploadToIHealth {
 				clientID := os.Getenv("IHEALTH_CLIENT_ID")
 				clientSecret := os.Getenv("IHEALTH_CLIENT_SECRET")
+				fmt.Println("Attempting to use iHealth Client ID from environment variable")
+				fmt.Println("Attempting to use iHealth Client Secret from environment variable")
 
 				// If environment variables are not set, prompt user
 				if clientID == "" {
@@ -97,6 +99,11 @@ func Execute() {
 				}
 
 				collector.Logger.Printf("iHealth credentials configured for upload")
+				err := data_collector.Authenticate(&collector)
+				if err != nil {
+					fmt.Printf("Authentication failed: %v\n", err)
+					os.Exit(1)
+				}
 			}
 
 			switch product {
@@ -179,6 +186,14 @@ func Execute() {
 						fmt.Printf("Supportpkg generated with warnings: %s\n", tarFile)
 					}
 
+					// Upload to iHealth if requested
+					if uploadToIHealth {
+						fmt.Println("Uploading support package to iHealth...")
+						if err := data_collector.UploadToIHealth(&collector, tarFile); err != nil {
+							fmt.Printf("Error uploading to iHealth: %v\n", err)
+							// Don't exit here, just warn, as the package is already generated
+						}
+					}
 				}
 			} else {
 				fmt.Println(" Error: Some namespaces do not exist")

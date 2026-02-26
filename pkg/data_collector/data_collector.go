@@ -51,6 +51,7 @@ import (
 type IHealthCreds struct {
 	ClientID     string
 	ClientSecret string
+	Token        string
 }
 
 type DataCollector struct {
