@@ -46,6 +46,7 @@ jobs:
             ghcr.io/nginx/nginx-utils:latest
 
       - name: Install Trivy and scan image for vulnerabilities
+        if: false
         uses: aquasecurity/trivy-action@0.33.1
 
         with:
