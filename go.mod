@@ -6,7 +6,7 @@ require (
 	github.com/mittwald/go-helm-client v0.12.18
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.10.0
-	go.uber.org/mock v0.5.0
+	go.uber.org/mock v0.6.0
 	helm.sh/helm/v3 v3.18.5
 	k8s.io/client-go v0.34.0
 )
