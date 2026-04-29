@@ -72,6 +72,13 @@ The plugin is invoked via `kubectl nginx-supportpkg` and has two required flags:
 * `-n` or `--namespace` indicates the namespace(s) where the product is running.
 * `-p` or `--product` indicates the product to collect information from.
 
+Optional flags:
+
+* `-u` or `--upload-to-ihealth` uploads the generated support package directly to F5 iHealth.
+* `-d` or `--exclude-db-data` excludes database data from collection (NIM only).
+* `-t` or `--exclude-time-series-data` excludes time series data from collection (NIM only).
+
+### Basic Usage
 
 ```
 $ kubectl nginx-supportpkg -n default -n nginx-ingress-0 -p nic
@@ -91,8 +98,43 @@ Running job metrics-information... OK
 Running job helm-info... OK
 Running job helm-deployments... OK
 Supportpkg successfully generated: nic-supportpkg-1711384966.tar.gz
+```
 
-```  
+### Upload to F5 iHealth
+
+You can automatically upload the generated support package to F5 iHealth for analysis:
+
+```
+$ kubectl nginx-supportpkg -n nginx-ingress -p nic -u
+Attempting to use iHealth Client ID from environment variable
+Attempting to use iHealth Client Secret from environment variable
+Enter iHealth Client ID: your-client-id
+Enter iHealth Client Secret: [hidden]
+Running job pod-list... OK
+...
+Supportpkg successfully generated: nic-supportpkg-1711384966.tar.gz
+Uploading support package to iHealth...
+Successfully uploaded nic-supportpkg-1711384966.tar.gz to iHealth.
+File Name: nic-supportpkg-1711384966.tar.gz
+Processing Status: NEW
+iHealth Link: https://ihealth2.f5.com/qkview-analyzer/api/...
+```
+
+#### iHealth Authentication
+
+For iHealth uploads, you need F5 iHealth API credentials. You can provide them in two ways:
+
+**Environment Variables (Recommended):**
+```bash
+export IHEALTH_CLIENT_ID="your-client-id"
+export IHEALTH_CLIENT_SECRET="your-client-secret"
+kubectl nginx-supportpkg -n nginx-ingress -p nic -u
+```
+
+**Interactive Prompts:**
+If environment variables are not set, the tool will prompt you to enter your credentials interactively. The Client Secret input is hidden for security.
+
+> **Note:** You can obtain iHealth API credentials from the F5 Customer Portal under your account settings.  
 
 ## The nginx-utils Package
 Please refer to its dedicated [README](/nginx-utils/README.md).
