@@ -19,22 +19,26 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/data_collector"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/jobs"
 	"github.com/nginxinc/nginx-k8s-supportpkg/pkg/version"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 func Execute() {
 
 	var product string
+	var uploadToIHealth bool
 	var jobList []jobs.Job
 	collector := data_collector.DataCollector{}
 
@@ -52,6 +56,55 @@ func Execute() {
 
 			collector.Logger.Printf("Starting kubectl-nginx-supportpkg - version: %s - build: %s", version.Version, version.Build)
 			collector.Logger.Printf("Input args are %v", os.Args)
+
+			// Handle iHealth credentials if upload flag is set
+			if uploadToIHealth {
+				clientID := os.Getenv("IHEALTH_CLIENT_ID")
+				clientSecret := os.Getenv("IHEALTH_CLIENT_SECRET")
+				fmt.Println("Attempting to use iHealth Client ID from environment variable")
+				fmt.Println("Attempting to use iHealth Client Secret from environment variable")
+
+				// If environment variables are not set, prompt user
+				if clientID == "" {
+					fmt.Print("Enter iHealth Client ID: ")
+					reader := bufio.NewReader(os.Stdin)
+					input, err := reader.ReadString('\n')
+					if err != nil {
+						fmt.Printf("Error reading Client ID: %v\n", err)
+						os.Exit(1)
+					}
+					clientID = strings.TrimSpace(input)
+				}
+
+				if clientSecret == "" {
+					fmt.Print("Enter iHealth Client Secret: ")
+					clientSecretBytes, err := term.ReadPassword(int(syscall.Stdin))
+					if err != nil {
+						fmt.Printf("\nError reading Client Secret: %v\n", err)
+						os.Exit(1)
+					}
+					fmt.Println() // Print newline after silent input
+					clientSecret = strings.TrimSpace(string(clientSecretBytes))
+				}
+
+				// Validate credentials are not empty
+				if clientID == "" || clientSecret == "" {
+					fmt.Println("Error: iHealth Client ID and Client Secret cannot be empty")
+					os.Exit(1)
+				}
+
+				collector.IHealthCreds = &data_collector.IHealthCreds{
+					ClientID:     clientID,
+					ClientSecret: clientSecret,
+				}
+
+				collector.Logger.Printf("iHealth credentials configured for upload")
+				err := data_collector.Authenticate(&collector)
+				if err != nil {
+					fmt.Printf("Authentication failed: %v\n", err)
+					os.Exit(1)
+				}
+			}
 
 			switch product {
 			case "nic":
@@ -133,6 +186,14 @@ func Execute() {
 						fmt.Printf("Supportpkg generated with warnings: %s\n", tarFile)
 					}
 
+					// Upload to iHealth if requested
+					if uploadToIHealth {
+						fmt.Println("Uploading support package to iHealth...")
+						if err := data_collector.UploadToIHealth(&collector, tarFile); err != nil {
+							fmt.Printf("Error uploading to iHealth: %v\n", err)
+							// Don't exit here, just warn, as the package is already generated
+						}
+					}
 				}
 			} else {
 				fmt.Println(" Error: Some namespaces do not exist")
@@ -154,6 +215,7 @@ func Execute() {
 
 	rootCmd.Flags().BoolVarP(&collector.ExcludeDBData, "exclude-db-data", "d", false, "exclude DB data collection")
 	rootCmd.Flags().BoolVarP(&collector.ExcludeTimeSeriesData, "exclude-time-series-data", "t", false, "exclude time series data collection")
+	rootCmd.Flags().BoolVarP(&uploadToIHealth, "upload-to-ihealth", "u", false, "upload support package to F5 iHealth")
 
 	versionStr := "nginx-supportpkg - version: " + version.Version + " - build: " + version.Build + "\n"
 	rootCmd.SetVersionTemplate(versionStr)
@@ -166,7 +228,7 @@ func Execute() {
 			"\n nginx-supportpkg -v|--version" +
 			"\n nginx-supportpkg [-n|--namespace] ns1 [-n|--namespace] ns2 [-p|--product] [nic,ngf,ngx,nim]" +
 			"\n nginx-supportpkg [-n|--namespace] ns1,ns2 [-p|--product] [nic,ngf,ngx,nim]" +
-			"\n nginx-supportpkg [-n|--namespace] ns1 [-n|--namespace] ns2 [-p|--product] [nim] [-d|--exclude-db-data] [-t|--exclude-time-series-data] \n")
+			"\n nginx-supportpkg [-n|--namespace] ns1 [-n|--namespace] ns2 [-p|--product] [nim] [-d|--exclude-db-data] [-t|--exclude-time-series-data] [-u|--upload-to-ihealth] \n")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
