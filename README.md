@@ -134,7 +134,7 @@ kubectl nginx-supportpkg -n nginx-ingress -p nic -u
 **Interactive Prompts:**
 If environment variables are not set, the tool will prompt you to enter your credentials interactively. The Client Secret input is hidden for security.
 
-> **Note:** You can obtain iHealth API credentials from the F5 Customer Portal under your account settings.  
+> **Note:** You can obtain iHealth API credentials from the F5 Customer Portal under your account settings. For detailed instructions, see the [F5 Knowledge Article K000130498](https://my.f5.com/manage/s/article/K000130498).  
 
 ## The nginx-utils Package
 Please refer to its dedicated [README](/nginx-utils/README.md).
