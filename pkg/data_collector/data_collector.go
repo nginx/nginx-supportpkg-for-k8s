@@ -48,6 +48,12 @@ import (
 	metricsClient "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
+type IHealthCreds struct {
+	ClientID     string
+	ClientSecret string
+	Token        string
+}
+
 type DataCollector struct {
 	BaseDir               string
 	Namespaces            []string
@@ -60,6 +66,7 @@ type DataCollector struct {
 	K8sHelmClientSet      map[string]helmClient.Client
 	ExcludeDBData         bool
 	ExcludeTimeSeriesData bool
+	IHealthCreds          *IHealthCreds
 	PodExecutor           func(namespace, pod, container string, command []string, ctx context.Context) ([]byte, error)
 	QueryCRD              func(crd crds.Crd, namespace string, ctx context.Context) ([]byte, error)
 }

@@ -48,3 +48,9 @@ Please go to the root directory of this project, `nginx-supportpkg-for-k8s` and 
 ```
 make nginx-utils
 ```
+
+# Related Features
+
+The `nginx-utils` image is part of the larger `nginx-supportpkg-for-k8s` project, which includes a kubectl plugin that can generate comprehensive support packages and optionally upload them to F5 iHealth for automated analysis. 
+
+For more information about generating support packages with iHealth integration, see the main [project README](../README.md).
