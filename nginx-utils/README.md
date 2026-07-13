@@ -17,6 +17,19 @@ kubectl -n <namespace> debug -it <nic-pod-name> --image=ghcr.io/nginx/nginx-util
 Please refer to the [nginx-utils packages page](https://github.com/nginx/nginx-supportpkg-for-k8s/pkgs/container/nginx-utils) for versions.  
 
 --------------
+#### Example usage of accessing N+ API:
+```
+kubectl -n <namespace> debug -it <pod-name> --image=ghcr.io/nginx/nginx-utils:latest --target=nginx-ingress --profile=sysadmin
+curl --unix-socket /proc/1/root/var/lib/nginx/nginx-plus-api.sock http://localhost/api
+
+[1,2,3,4,5,6,7,8,9]
+```
+Note on `/proc/1/root/` :
+
+* A debug container doesn't have the required privileges to "peek" into another container's root filesystem
+* By default, containers cannot access the /proc entries of other containers for security
+* The sysadmin profile relaxes those security boundaries for this specific ephemeral container, allowing you to actually reach /proc/1/root/
+
 #### Example usage of `api_stats.sh` found in the container:
 The `api_stats.sh` script is designed to facilitate accessing the [/api](https://nginx.org/en/docs/http/ngx_http_api_module.html#api) endpoint to query various status information, configuring upstream server groups on-the-fly, and managing key-value pairs without the need of reconfiguring nginx.
 
