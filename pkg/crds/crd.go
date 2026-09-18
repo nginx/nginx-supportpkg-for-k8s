@@ -57,6 +57,11 @@ func GetNICCRDList() []Crd {
 			Version:  "v1beta1",
 		},
 		{
+			Resource: "apsignatures",
+			Group:    "appprotect.f5.com",
+			Version:  "v1beta1",
+		},
+		{
 			Resource: "globalconfigurations",
 			Group:    "k8s.nginx.org",
 			Version:  "v1",
@@ -110,3 +115,35 @@ func GetNGFCRDList() []Crd {
 	}
 	return crdList
 }
+
+func GetPLMCRDList() []Crd {
+	crdList := []Crd{
+		{
+			Resource: "aplogconfs",
+			Group:    "appprotect.f5.com",
+			Version:  "v1beta1",
+		},
+		{
+			Resource: "appolicies",
+			Group:    "appprotect.f5.com",
+			Version:  "v1beta1",
+		},
+		{
+			Resource: "apusersigs",
+			Group:    "appprotect.f5.com",
+			Version:  "v1beta1",
+		},
+		{
+			Resource: "apsignatures",
+			Group:    "appprotect.f5.com",
+			Version:  "v1beta1",
+		},
+		{
+			Resource: "seaweedfses",
+			Group:    "seaweedfs.com",
+			Version:  "v1",
+		},
+	}
+	return crdList
+}
+
