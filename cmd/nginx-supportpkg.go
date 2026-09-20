@@ -109,6 +109,8 @@ func Execute() {
 			switch product {
 			case "nic":
 				jobList = slices.Concat(jobs.CommonJobList(), jobs.NICJobList())
+			case "plm":
+				jobList = slices.Concat(jobs.CommonJobList(), jobs.PLMJobList())
 			case "ngf":
 				jobList = slices.Concat(jobs.CommonJobList(), jobs.NGFJobList())
 			case "ngx":
@@ -116,8 +118,13 @@ func Execute() {
 			case "nim":
 				jobList = slices.Concat(jobs.CommonJobList(), jobs.NIMJobList())
 			default:
-				fmt.Printf("Error: product must be in the following list: [nic, ngf, ngx, nim]\n")
+				fmt.Printf("Error: product must be in the following list: [nic, ngf, ngx, nim, plm]\n")
 				os.Exit(1)
+			}
+
+			if product != "plm" && jobs.IsPLMNamespace(&collector, cmd.Context()) {
+				collector.Logger.Printf("PLM deployment detected, including PLM diagnostics")
+				jobList = slices.Concat(jobList, jobs.PLMJobList())
 			}
 
 			if collector.AllNamespacesExist() {
@@ -226,8 +233,8 @@ func Execute() {
 			"Usage:" +
 			"\n nginx-supportpkg -h|--help" +
 			"\n nginx-supportpkg -v|--version" +
-			"\n nginx-supportpkg [-n|--namespace] ns1 [-n|--namespace] ns2 [-p|--product] [nic,ngf,ngx,nim]" +
-			"\n nginx-supportpkg [-n|--namespace] ns1,ns2 [-p|--product] [nic,ngf,ngx,nim]" +
+			"\n nginx-supportpkg [-n|--namespace] ns1 [-n|--namespace] ns2 [-p|--product] [nic,ngf,ngx,nim,plm]" +
+			"\n nginx-supportpkg [-n|--namespace] ns1,ns2 [-p|--product] [nic,ngf,ngx,nim,plm]" +
 			"\n nginx-supportpkg [-n|--namespace] ns1 [-n|--namespace] ns2 [-p|--product] [nim] [-d|--exclude-db-data] [-t|--exclude-time-series-data] [-u|--upload-to-ihealth] \n")
 
 	if err := rootCmd.Execute(); err != nil {
